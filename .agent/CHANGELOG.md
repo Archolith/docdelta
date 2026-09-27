@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-27 - Patched condition measured on smolagents
+
+- `examples/patches/smolagents.patch`: AGENTS.md gains CONTRIBUTING.md's process rules and the
+  dev commands. It was hand-drafted with knowledge of the t2 gold.
+- smolagents t2, 5 judged repeats, $0.029 for agents plus $0.003 for the judge:
+  - patched: 0.87 score, 144k median tokens, all 4 rules in 5/5 runs;
+  - with docs: 0.63, 2/5;
+  - without docs: 0.80, 5/5.
+  - Key points: 3/5 patched vs 2/5 in both other conditions; the patch doesn't mention them, so treat this as noise.
+
 ## 2026-09-27 - LLM judge, token change in the badge, 5-repeat run
 
 - `judge.py` (new, ported from beacon_eval and widened to guardrails): the evidence must be copied from

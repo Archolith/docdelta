@@ -1,0 +1,20 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index 444c8a7..9f6a000 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -2,3 +2,15 @@
+ - Follow OOP principles
+ - Be Pythonic: follow Python best practices and idiomatic patterns
+ - Write unit tests for new functionality
++
++## Before you open a pull request
++Read CONTRIBUTING.md first. Its process rules apply to every change:
++- Open an issue first and wait for a maintainer to label it `status:accepted` before writing the patch (anything larger than a typo).
++- Keep one open pull request at a time until your first one is merged.
++- Tell the maintainers if you used an AI assistant; a person must have read the diff, run the tests and stand behind it.
++- Core ships primitives, not integrations: new tools and provider wrappers belong on the Hub.
++
++## Commands
++- Install: `pip install -e ".[dev]"`
++- Check: `make quality`; auto-fix style: `make style`
++- Test: `make test`
