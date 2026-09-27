@@ -22,6 +22,7 @@ from docdelta.budget import AccountingError, Budget, BudgetExhausted, RateLimite
 from docdelta.checkout import export_commit, remove_tree, seal
 from docdelta.conditions import DEFAULT_CONDITIONS, PATCHED, prepare
 from docdelta.execution import CommandCheck, CommandExecutor, command_success
+from docdelta.judge import judged_scores
 from docdelta.models import RepoPin, RunResult, Task
 from docdelta.scoring import extract_answer, score
 
@@ -144,11 +145,14 @@ def run_one(
 
 
 def load_results(workdir: Path, repo: str | None = None) -> list[RunResult]:
+    """Saved finished runs, with any judged metrics merged into their scores."""
     root = workdir / "runs" / (repo or "")
-    return [
-        RunResult.from_json(json.loads(path.read_text(encoding="utf-8")))
-        for path in sorted(root.rglob(RESULT_FILE))
-    ]
+    results = []
+    for path in sorted(root.rglob(RESULT_FILE)):
+        result = RunResult.from_json(json.loads(path.read_text(encoding="utf-8")))
+        result.scores.update(judged_scores(path.parent))
+        results.append(result)
+    return results
 
 
 def run_matrix(

@@ -1,4 +1,4 @@
-"""Command line: ``docdelta run | report | badge | list-agent-docs``.
+"""Command line: ``docdelta run | judge | report | badge | list-agent-docs``.
 
 Exit codes: 0 ok, 1 usage or setup error, 2 budget exhausted, 3 rate limited.
 """
@@ -13,6 +13,14 @@ from pathlib import Path
 from docdelta.agents import make_agent
 from docdelta.budget import AccountingError, Budget, BudgetExhausted, RateLimited
 from docdelta.conditions import CONDITIONS, DEFAULT_CONDITIONS, find_agent_docs
+from docdelta.agents.opencode import load_api_keys
+from docdelta.judge import (
+    DEFAULT_JUDGE_MODEL,
+    JudgeBudgetExhausted,
+    JudgeRateLimited,
+    judge_workdir,
+    openai_call,
+)
 from docdelta.models import load_repos, load_tasks
 from docdelta.report import badge, scorecard_markdown
 from docdelta.runner import MatrixConfig, UnreviewedTasks, load_results, run_matrix
@@ -64,6 +72,13 @@ def _parser() -> argparse.ArgumentParser:
     badge_cmd.add_argument("--repo", required=True)
     badge_cmd.add_argument("--out", type=Path, default=None)
 
+    judge_cmd = sub.add_parser("judge", help="LLM-judge guardrails and key points of saved runs")
+    judge_cmd.add_argument("--workdir", type=Path, required=True)
+    judge_cmd.add_argument("--tasks", type=Path, required=True)
+    judge_cmd.add_argument("--env-file", type=Path, required=True, help=".env with OPENAI_API_KEY")
+    judge_cmd.add_argument("--model", default=DEFAULT_JUDGE_MODEL)
+    judge_cmd.add_argument("--cap-usd", type=float, default=0.10)
+
     docs = sub.add_parser("list-agent-docs", help="list the agent docs a checkout contains")
     docs.add_argument("path", type=Path)
     return parser
@@ -81,6 +96,23 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "list-agent-docs":
         _emit("\n".join(find_agent_docs(args.path)), None)
+        return 0
+    if args.command == "judge":
+        key = load_api_keys(args.env_file).get("OPENAI_API_KEY")
+        if not key:
+            print(f"no OPENAI_API_KEY in {args.env_file}", file=sys.stderr)
+            return 1
+        try:
+            count, spent = judge_workdir(
+                args.workdir, args.tasks, openai_call(key, args.model), args.model, args.cap_usd
+            )
+        except JudgeBudgetExhausted as exc:
+            print(f"stopped: judge budget: {exc}", file=sys.stderr)
+            return 2
+        except JudgeRateLimited as exc:
+            print(f"stopped: judge rate limited, not retrying: {exc}", file=sys.stderr)
+            return 3
+        print(f"{count} runs judged; spent ${spent:.4f}", file=sys.stderr)
         return 0
     if args.command in ("report", "badge"):
         results = load_results(args.workdir, args.repo)

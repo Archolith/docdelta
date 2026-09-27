@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-27 - LLM judge, token change in the badge, 5-repeat run
+
+- `judge.py` (new, ported from beacon_eval and widened to guardrails): the evidence must be copied from
+  the answer, one passage credits one item, results are cached per run in `judged.json`, and it stops
+  at its dollar cap or on a 429.
+- `report.py`: the answer score prefers judged metrics. Adds the median token change. The badge now
+  reads `<score> score | <tokens> tokens | n/m tasks`.
+- `runner.load_results` merges judged scores. `cli.py` gains a `judge` subcommand.
+- Tests: 28 passing.
+- smolagents t2 with gpt-6-luna, 5 repeats, judged ($0.078 for agents, $0.005 for the judge):
+  - with docs: 0.63 score, 143k median tokens;
+  - without docs: 0.80 score, 158k median tokens;
+  - all 4 guardrails: 2/5 runs with docs vs 5/5 without (Fisher p ~ 0.17).
+
 ## 2026-09-27 - OpenCode adapter and first real run
 
 - `agents/opencode.py`: ported from archolith-bench beacon_eval 67d7fc9. Adds an isolated

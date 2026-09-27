@@ -20,8 +20,9 @@ saved results only.
 | `scoring.py` | built (ported) | Deterministic scoring from archolith-bench 67d7fc9 |
 | `budget.py` | built | Token and dollar caps; RateLimited |
 | `runner.py` | built | Matrix, resume, rate-limit stop, unreviewed-gold guard |
-| `report.py` | built | Answer score, scorecard markdown, shields endpoint badge |
-| `cli.py` | built | run, report, badge, list-agent-docs |
+| `report.py` | built | Answer score (judged metrics preferred), token change, scorecard, shields endpoint badge |
+| `judge.py` | built (ported) | LLM judge for guardrails and key points; grounded evidence, per-run cache, $ cap, 429 stop |
+| `cli.py` | built | run, judge, report, badge, list-agent-docs |
 | `agents/fake.py` | built | ScriptedAgent, DocReadingAgent (free, deterministic) |
 | `agents/opencode.py` | built (ported) | Isolated config home, streamed events, 429/reserve/timeout kill, resume, key redaction |
 | `execution.py` | **stub** (NoExecution only) | Run proposed commands in a network-less container |

@@ -16,6 +16,8 @@ from docdelta.conditions import WITH_DOCS, WITHOUT_DOCS
 from docdelta.models import RunResult
 
 ANSWER_METRICS = ("command_recall", "guardrail_recall", "point_recall", "verdict_correct")
+#: A judged metric, when present, stands in for its deterministic counterpart.
+JUDGED = {"guardrail_recall": "guardrail_recall_judged", "point_recall": "point_recall_judged"}
 #: Fewer runs than this per task and condition and the badge says so instead of a number.
 MIN_REPEATS = 2
 #: A delta inside this band is shown as "no clear effect".
@@ -25,8 +27,31 @@ NOISE_BAND = 0.05
 def answer_score(scores: dict[str, float]) -> float | None:
     if scores.get("answered", 0.0) == 0.0:
         return 0.0
-    values = [scores[name] for name in ANSWER_METRICS if name in scores]
+    values = []
+    for name in ANSWER_METRICS:
+        judged = JUDGED.get(name)
+        if judged and judged in scores:
+            values.append(scores[judged])
+        elif name in scores:
+            values.append(scores[name])
     return mean(values) if values else None
+
+
+def is_judged(results: list[RunResult]) -> bool:
+    return bool(results) and all(
+        any(metric in r.scores for metric in JUDGED.values()) for r in results
+    )
+
+
+def token_change(
+    results: list[RunResult], with_condition: str = WITH_DOCS, without_condition: str = WITHOUT_DOCS
+) -> float | None:
+    """Median tokens with docs relative to without (-0.57 = 57% fewer); None if either is missing."""
+    with_tokens = [r.total_tokens for r in results if r.condition == with_condition]
+    without_tokens = [r.total_tokens for r in results if r.condition == without_condition]
+    if not with_tokens or not without_tokens or median(without_tokens) == 0:
+        return None
+    return median(with_tokens) / median(without_tokens) - 1
 
 
 @dataclass
@@ -107,13 +132,19 @@ def scorecard_markdown(results: list[RunResult], repo: str) -> str:
         cells = [f"{_fmt(per[c][0])} ({per[c][1]})" if c in per else "-" for c in conditions]
         lines.append(f"| {task} | " + " | ".join(cells) + " |")
     badge_data = badge(results)
+    scoring = (
+        "Guardrails and key points are LLM-judged (evidence must be copied from the answer)."
+        if is_judged(results)
+        else "Scored deterministically only (word matching; misses paraphrases). Run `docdelta judge`."
+    )
     lines += [
         "",
         f"**Badge:** {badge_data['label']}: {badge_data['message']}",
         "",
         "Answer score = mean of command, guardrail, key-point and verdict recall that each task's "
-        f"gold defines. Deltas within +/-{NOISE_BAND} are reported as no clear effect; with few "
-        "repeats even larger deltas can be noise.",
+        f"gold defines. {scoring} Deltas within +/-{NOISE_BAND} are reported as no clear effect; "
+        "with few repeats even larger deltas can be noise. Tokens = change in median tokens per "
+        "run with docs versus without.",
         "",
     ]
     return "\n".join(lines)
@@ -148,9 +179,11 @@ def badge(
         color = "orange"
     else:
         color = "lightgrey"
+    tokens = token_change(results, with_condition, without_condition)
+    token_part = f" | {tokens:+.0%} tokens" if tokens is not None else ""
     return {
         "schemaVersion": 1,
         "label": label,
-        "message": f"{delta:+.2f} vs none | {passed}/{len(tasks)} tasks",
+        "message": f"{delta:+.2f} score{token_part} | {passed}/{len(tasks)} tasks",
         "color": color,
     }

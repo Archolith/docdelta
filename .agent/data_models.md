@@ -18,7 +18,8 @@ All in `src/docdelta/models.py`.
   (`{item, path, line_start, line_end, quote}`), beacon_eval format.
 - `<workdir>/cache/<repo>.git`: bare clone.
 - `<workdir>/runs/<repo>/<task>/<condition>/r<n>/`: `prompt.txt`, `result.json` or
-  `rate_limited.json`, `checkout/` only with `--keep-checkouts`.
+  `rate_limited.json` or `stopped.json`, `judged.json` (judge verdicts and
+  `guardrail_recall_judged` / `point_recall_judged`), `checkout/` only with `--keep-checkouts`.
 
 ## Conditions
 
