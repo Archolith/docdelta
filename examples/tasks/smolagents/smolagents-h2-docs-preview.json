@@ -1,0 +1,34 @@
+{
+  "repo": "smolagents",
+  "task_id": "smolagents-h2-docs-preview",
+  "kind": "commands_and_guardrails",
+  "prompt": "You want to rename the section header \"Our local Python executor\" in the English secure code execution tutorial and fix a typo under it, then preview the rendered docs locally before opening a PR. Which file do you edit, what exact commands install the doc tooling and build or preview the English docs, and what project rules apply to renaming a section header and to the built output?",
+  "reviewed": false,
+  "gold": {
+    "docs": ["docs/README.md"],
+    "files": ["docs/source/en/tutorials/secure_code_execution.md"],
+    "acceptable_files": ["docs/source/en/_toctree.yml", "CONTRIBUTING.md"],
+    "commands": [
+      "pip install -e .",
+      "pip install git+https://github.com/huggingface/doc-builder@main",
+      "doc-builder preview smolagents docs/source/en/"
+    ],
+    "allowed_flags": ["--build_dir"],
+    "guardrails": [
+      ["keep old anchor", "preserve the original anchor", "keep the old links working", "sections that were moved"],
+      ["do not commit the built documentation", "don't commit built docs", "no need to commit the built documentation"]
+    ],
+    "points": [],
+    "risky": []
+  },
+  "gold_citations": [
+    {"item": "docs/README.md", "path": "docs/README.md", "line_start": 17, "line_end": 19, "quote": "# Generating the documentation"},
+    {"item": "docs/source/en/tutorials/secure_code_execution.md", "path": "docs/source/en/tutorials/secure_code_execution.md", "line_start": 49, "line_end": 49, "quote": "### Our local Python executor"},
+    {"item": "pip install -e .", "path": "docs/README.md", "line_start": 21, "line_end": 25, "quote": "pip install -e ."},
+    {"item": "pip install git+https://github.com/huggingface/doc-builder@main", "path": "docs/README.md", "line_start": 29, "line_end": 32, "quote": "pip install git+https://github.com/huggingface/doc-builder@main"},
+    {"item": "doc-builder preview smolagents docs/source/en/", "path": "docs/README.md", "line_start": 57, "line_end": 61, "quote": "doc-builder preview smolagents docs/source/en/"},
+    {"item": "keep old anchor", "path": "docs/README.md", "line_start": 83, "line_end": 93, "quote": "we simply keep a little map of moved sections at the end of the document where the original section was. The key is to preserve the original anchor."},
+    {"item": "do not commit the built documentation", "path": "docs/README.md", "line_start": 37, "line_end": 38, "quote": "You don't have to commit the built documentation."}
+  ],
+  "notes": "Held-out from examples/patches/smolagents.patch. `doc-builder build smolagents docs/source/en/ --build_dir ...` (README line 48) is an acceptable alternative to preview; gold requires preview because the prompt asks to preview. Drafted by Claude 2026-09-27; needs owner review."
+}

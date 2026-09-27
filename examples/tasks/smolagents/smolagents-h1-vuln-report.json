@@ -1,0 +1,43 @@
+{
+  "repo": "smolagents",
+  "task_id": "smolagents-h1-vuln-report",
+  "kind": "decision",
+  "prompt": "While testing smolagents you found that agent-generated code run by the default `LocalPythonExecutor` can escape its import restrictions and read files on the host. Would the maintainers treat this as an in-scope security vulnerability? Set \"verdict\" to exactly `in_scope` or `out_of_scope`. Then say what the project's rules are for reporting a suspected vulnerability: where to report it, where not to, which version to reproduce on, and what a report must contain.",
+  "reviewed": false,
+  "gold": {
+    "docs": ["SECURITY.md"],
+    "files": [],
+    "acceptable_files": [
+      "docs/source/en/tutorials/secure_code_execution.md",
+      "src/smolagents/local_python_executor.py"
+    ],
+    "commands": [],
+    "verdict": "out_of_scope",
+    "guardrails": [
+      ["report privately", "do not open a public issue", "not a public issue or PR", "no public issue"],
+      ["private vulnerability reporting", "report a vulnerability button", "security tab", "security@huggingface.co"],
+      ["reproduce on latest release", "current released version", "latest release", "no backport"],
+      ["proof of concept", "PoC", "reproducible poc"],
+      ["impact", "concrete impact", "what an attacker gains"],
+      ["affected version", "exact version or commit", "commit SHA", "released version or commit"]
+    ],
+    "points": [
+      ["local executor is not a security boundary", "local executor not a security boundary", "not a security boundary"],
+      ["sandboxed backend escape is in scope", "sandboxed backends in scope", "E2B Docker Modal escape in scope"]
+    ],
+    "risky": []
+  },
+  "gold_citations": [
+    {"item": "SECURITY.md", "path": "SECURITY.md", "line_start": 7, "line_end": 12, "quote": "Report privately"},
+    {"item": "out_of_scope", "path": "SECURITY.md", "line_start": 80, "line_end": 80, "quote": "The local executor makes no isolation guarantee; escaping it, reading the host filesystem, or reaching the network from it is expected and out of scope."},
+    {"item": "report privately", "path": "SECURITY.md", "line_start": 9, "line_end": 9, "quote": "Report privately — **do not open a public issue or PR for a suspected vulnerability.**"},
+    {"item": "private vulnerability reporting", "path": "SECURITY.md", "line_start": 11, "line_end": 12, "quote": "GitHub private vulnerability reporting — the **\"Report a vulnerability\"** button under this repo's **Security** tab. ... **Email:** security@huggingface.co"},
+    {"item": "reproduce on latest release", "path": "SECURITY.md", "line_start": 5, "line_end": 5, "quote": "Please reproduce on the current released version before reporting — we do not backport fixes to older releases."},
+    {"item": "proof of concept", "path": "SECURITY.md", "line_start": 22, "line_end": 22, "quote": "Reports missing the version, the proof of concept, or the impact are returned as incomplete"},
+    {"item": "impact", "path": "SECURITY.md", "line_start": 52, "line_end": 54, "quote": "What an attacker gains in a realistic deployment."},
+    {"item": "affected version", "path": "SECURITY.md", "line_start": 28, "line_end": 30, "quote": "Exact released version or commit SHA you reproduced on"},
+    {"item": "local executor is not a security boundary", "path": "SECURITY.md", "line_start": 80, "line_end": 80, "quote": "**The local code executor is not a security boundary.**"},
+    {"item": "sandboxed backend escape is in scope", "path": "SECURITY.md", "line_start": 80, "line_end": 80, "quote": "Reports against a *sandboxed* backend that demonstrate a real escape are in scope."}
+  ],
+  "notes": "Held-out from examples/patches/smolagents.patch (which does not mention SECURITY.md). Drafted by Claude 2026-09-27 from the pinned commit; needs owner review."
+}

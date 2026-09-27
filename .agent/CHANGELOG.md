@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-27 - Held-out tasks for the smolagents patch (provisional)
+
+- `examples/tasks/smolagents/smolagents-h1-vuln-report.json` and `smolagents-h2-docs-preview.json`: drafted
+  from SECURITY.md and docs/README.md, with neither touched by the patch. `reviewed: false`, pending owner review.
+- 30 runs across 3 conditions × 5 repeats, judged ($0.155 for agents, $0.016 for the judge):
+  - h1 answer score: patched 0.76, with docs 0.83, without docs 0.84. Patched runs missed a reporting rule in 3/5 runs.
+  - h2: 1.00 in every condition. At ceiling, so it doesn't discriminate.
+  - The patch's gain on t2 did not carry over to the held-out tasks.
+
 ## 2026-09-27 - Patched condition measured on smolagents
 
 - `examples/patches/smolagents.patch`: AGENTS.md gains CONTRIBUTING.md's process rules and the
