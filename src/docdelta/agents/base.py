@@ -17,6 +17,11 @@ class AgentRun:
     error: str = ""
     #: The provider answered 429 / rate limit. The matrix stops and never retries.
     rate_limited: bool = False
+    #: A reason the matrix must stop after this run: "over_reserve" (killed at its spend
+    #: reserve), "no_usage" or "no_cost" (spend cannot be accounted). Empty otherwise.
+    stop: str = ""
+    tool_calls: int = 0
+    resumes: int = 0
 
 
 class AgentAdapter(Protocol):
@@ -30,4 +35,8 @@ class AgentAdapter(Protocol):
 
     name: str
 
-    def run(self, prompt: str, cwd: Path, *, timeout_s: float) -> AgentRun: ...
+    def run(
+        self, prompt: str, cwd: Path, *, timeout_s: float, log_dir: Path | None = None
+    ) -> AgentRun:
+        """*log_dir* receives raw logs (outside *cwd*, so the agent never reads them)."""
+        ...

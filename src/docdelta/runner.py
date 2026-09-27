@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from docdelta.agents.base import AgentAdapter
-from docdelta.budget import Budget, RateLimited
+from docdelta.budget import AccountingError, Budget, BudgetExhausted, RateLimited
 from docdelta.checkout import export_commit, remove_tree, seal
 from docdelta.conditions import DEFAULT_CONDITIONS, PATCHED, prepare
 from docdelta.execution import CommandCheck, CommandExecutor, command_success
@@ -41,6 +41,7 @@ ANSWER_INSTRUCTIONS = (
 
 RESULT_FILE = "result.json"
 RATE_LIMITED_FILE = "rate_limited.json"
+STOPPED_FILE = "stopped.json"
 
 
 class UnreviewedTasks(RuntimeError):
@@ -76,7 +77,8 @@ def run_one(
     config: MatrixConfig,
     executor: CommandExecutor | None = None,
 ) -> RunResult:
-    directory = run_dir(config.workdir, pin.name, task.task_id, condition, repeat)
+    # Absolute: the agent resolves PWD and its cwd against each other (a relative path doubles).
+    directory = run_dir(config.workdir, pin.name, task.task_id, condition, repeat).resolve()
     directory.mkdir(parents=True, exist_ok=True)
     checkout = directory / "checkout"
     remove_tree(checkout)
@@ -93,7 +95,7 @@ def run_one(
     (directory / "prompt.txt").write_text(prompt, encoding="utf-8")
 
     started = time.monotonic()
-    run = agent.run(prompt, checkout, timeout_s=config.timeout_s)
+    run = agent.run(prompt, checkout, timeout_s=config.timeout_s, log_dir=directory)
     seconds = run.seconds or (time.monotonic() - started)
 
     answer = extract_answer(run.final_text)
@@ -124,9 +126,17 @@ def run_one(
         agent=agent.name,
         sealed_commit=sealed,
         rate_limited=run.rate_limited,
+        stop=run.stop,
+        tool_calls=run.tool_calls,
+        resumes=run.resumes,
     )
-    # A rate-limited run is kept for the record but never reused as a finished result.
-    name = RATE_LIMITED_FILE if run.rate_limited else RESULT_FILE
+    # A rate-limited or stopped run is kept for the record but never reused as finished.
+    if run.rate_limited:
+        name = RATE_LIMITED_FILE
+    elif run.stop:
+        name = STOPPED_FILE
+    else:
+        name = RESULT_FILE
     (directory / name).write_text(json.dumps(result.to_json(), indent=1), encoding="utf-8")
     if not config.keep_checkouts:
         remove_tree(checkout)
@@ -169,9 +179,12 @@ def run_matrix(
                 budget.check()
                 result = run_one(task, pin, condition, repeat, agent, config, executor)
                 budget.spend(result.total_tokens, result.cost_usd)
+                where = f"{pin.name}/{task.task_id}/{condition}/r{repeat}"
                 if result.rate_limited:
-                    raise RateLimited(
-                        f"{pin.name}/{task.task_id}/{condition}/r{repeat}: {result.error}"
-                    )
+                    raise RateLimited(f"{where}: {result.error}")
+                if result.stop == "over_reserve":
+                    raise BudgetExhausted(f"{where} passed its per-run reserve and was killed")
+                if result.stop:
+                    raise AccountingError(f"{where}: {result.stop}; spend cannot be tracked")
                 results.append(result)
     return results

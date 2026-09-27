@@ -82,6 +82,9 @@ class RunResult:
     agent: str = ""
     sealed_commit: str = ""
     rate_limited: bool = False
+    stop: str = ""
+    tool_calls: int = 0
+    resumes: int = 0
 
     @property
     def total_tokens(self) -> int:

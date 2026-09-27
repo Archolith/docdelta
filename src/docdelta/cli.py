@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from docdelta.agents import make_agent
-from docdelta.budget import Budget, BudgetExhausted, RateLimited
+from docdelta.budget import AccountingError, Budget, BudgetExhausted, RateLimited
 from docdelta.conditions import CONDITIONS, DEFAULT_CONDITIONS, find_agent_docs
 from docdelta.models import load_repos, load_tasks
 from docdelta.report import badge, scorecard_markdown
@@ -35,14 +35,19 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--tasks", type=Path, required=True, help="directory of <repo>/<task>.json")
     run.add_argument("--workdir", type=Path, required=True)
     run.add_argument("--agent", default="doc-reader", help="doc-reader (free, fake) or opencode")
-    run.add_argument("--model", default="")
+    run.add_argument("--model", default="", help="opencode model (default openai/gpt-6-luna)")
+    run.add_argument("--env-file", type=Path, default=None,
+                     help=".env whose *_API_KEY values reach only the agent process")
+    run.add_argument("--config-source", type=Path, default=None,
+                     help="opencode.json to take the model's provider block from")
     run.add_argument("--conditions", type=_conditions, default=DEFAULT_CONDITIONS)
     run.add_argument("--repeats", type=int, default=3)
     run.add_argument("--repo", action="append", default=[], help="limit to these repos")
     run.add_argument("--task", action="append", default=[], help="limit to these task ids")
     run.add_argument("--patch-dir", type=Path, default=None)
     run.add_argument("--cap-usd", type=float, default=None)
-    run.add_argument("--reserve-usd", type=float, default=0.0)
+    run.add_argument("--reserve-usd", type=float, default=0.10,
+                     help="dollars held per run under --cap-usd; a run past it is killed")
     run.add_argument("--cap-tokens", type=int, default=None)
     run.add_argument("--reserve-tokens", type=int, default=400_000)
     run.add_argument("--timeout", type=float, default=900.0)
@@ -109,9 +114,19 @@ def main(argv: list[str] | None = None) -> int:
         reserve_usd=args.reserve_usd,
     )
     try:
-        agent = make_agent(args.agent, args.model)
+        if args.agent != "doc-reader" and args.cap_usd is None and args.cap_tokens is None:
+            print("error: a paid agent needs --cap-usd or --cap-tokens", file=sys.stderr)
+            return 1
+        agent = make_agent(
+            args.agent,
+            args.model,
+            env_file=args.env_file,
+            config_source=args.config_source,
+            reserve_tokens=args.reserve_tokens if args.cap_tokens is not None else None,
+            reserve_usd=args.reserve_usd if args.cap_usd is not None else None,
+        )
         results = run_matrix(tasks, repos, agent, config, budget)
-    except BudgetExhausted as exc:
+    except (BudgetExhausted, AccountingError) as exc:
         print(f"stopped: budget: {exc}", file=sys.stderr)
         return 2
     except RateLimited as exc:

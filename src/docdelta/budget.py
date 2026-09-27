@@ -9,6 +9,10 @@ class BudgetExhausted(RuntimeError):
     """The next run's reserve would pass a cap."""
 
 
+class AccountingError(RuntimeError):
+    """A run reported no usage or no cost, so the caps cannot be kept."""
+
+
 class RateLimited(RuntimeError):
     """The provider rate-limited a run. The matrix stops; nothing is retried."""
 

@@ -32,7 +32,9 @@ class ScriptedAgent:
         self._respond = respond
         self.calls = 0
 
-    def run(self, prompt: str, cwd: Path, *, timeout_s: float) -> AgentRun:
+    def run(
+        self, prompt: str, cwd: Path, *, timeout_s: float, log_dir: Path | None = None
+    ) -> AgentRun:
         self.calls += 1
         return AgentRun(final_text=_answer_text(self._respond(prompt, cwd)))
 
@@ -49,7 +51,9 @@ class DocReadingAgent:
     def __init__(self) -> None:
         self.calls = 0
 
-    def run(self, prompt: str, cwd: Path, *, timeout_s: float) -> AgentRun:
+    def run(
+        self, prompt: str, cwd: Path, *, timeout_s: float, log_dir: Path | None = None
+    ) -> AgentRun:
         self.calls += 1
         sources = find_agent_docs(cwd)
         if (cwd / "README.md").is_file():

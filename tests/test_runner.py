@@ -65,7 +65,9 @@ class _RateLimitedAgent:
     def __init__(self) -> None:
         self.calls = 0
 
-    def run(self, prompt: str, cwd: Path, *, timeout_s: float) -> AgentRun:
+    def run(
+        self, prompt: str, cwd: Path, *, timeout_s: float, log_dir: Path | None = None
+    ) -> AgentRun:
         self.calls += 1
         return AgentRun(final_text="", error="429 too many requests", rate_limited=True)
 
@@ -103,3 +105,21 @@ def test_cli_run_report_badge(sample_repo: RepoPin, tmp_path: Path, capsys) -> N
     out = tmp_path / "badge.json"
     assert main(["badge", "--workdir", str(work), "--repo", "sample", "--out", str(out)]) == 0
     assert json.loads(out.read_text(encoding="utf-8"))["schemaVersion"] == 1
+
+
+class _OverReserveAgent:
+    name = "over"
+
+    def run(
+        self, prompt: str, cwd: Path, *, timeout_s: float, log_dir: Path | None = None
+    ) -> AgentRun:
+        return AgentRun(final_text="", cost_usd=0.2, error="over_reserve", stop="over_reserve")
+
+
+def test_over_reserve_stops_and_is_not_reused(sample_repo: RepoPin, tmp_path: Path) -> None:
+    config = MatrixConfig(workdir=tmp_path / "work", repeats=1)
+    budget = Budget(cap_usd=1.0, reserve_usd=0.1)
+    with pytest.raises(BudgetExhausted):
+        run_matrix([TASK], {"sample": sample_repo}, _OverReserveAgent(), config, budget)
+    assert budget.used_usd == pytest.approx(0.2)
+    assert load_results(config.workdir) == []

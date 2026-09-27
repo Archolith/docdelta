@@ -23,7 +23,7 @@ saved results only.
 | `report.py` | built | Answer score, scorecard markdown, shields endpoint badge |
 | `cli.py` | built | run, report, badge, list-agent-docs |
 | `agents/fake.py` | built | ScriptedAgent, DocReadingAgent (free, deterministic) |
-| `agents/opencode.py` | **stub** | Port isolation + streaming from beacon_eval |
+| `agents/opencode.py` | built (ported) | Isolated config home, streamed events, 429/reserve/timeout kill, resume, key redaction |
 | `execution.py` | **stub** (NoExecution only) | Run proposed commands in a network-less container |
 | `gold.py` | **stub** | Draft tasks and gold from build files, CI and docs |
 | `patch.py` | **stub** | Suggest an AGENTS.md patch from missed gold items |
@@ -35,5 +35,5 @@ saved results only.
 - Adapters must isolate the agent from the operator's global instruction files; otherwise
   `without_docs` is contaminated.
 - Proposed commands never run on the host.
-- Rate limits stop the matrix; rate-limited results are saved as `rate_limited.json` and
-  never reused as finished runs.
+- Rate limits and spend stops end the matrix; such runs are saved as `rate_limited.json` or
+  `stopped.json` and never reused as finished runs.
