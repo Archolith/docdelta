@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "docdelta"
+version = "0.0.1"
+description = "A/B test a repository's agent docs: run a coding agent with and without AGENTS.md and score the difference"
+license = "Apache-2.0"
+authors = [{name = "Charles Harvey"}]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+docdelta = "docdelta.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

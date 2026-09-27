@@ -1,0 +1,3 @@
+# docdelta
+
+Read `AGENTS.md` and everything in `.agent/` before starting work.

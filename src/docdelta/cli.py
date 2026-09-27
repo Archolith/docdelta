@@ -1,0 +1,127 @@
+"""Command line: ``docdelta run | report | badge | list-agent-docs``.
+
+Exit codes: 0 ok, 1 usage or setup error, 2 budget exhausted, 3 rate limited.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from docdelta.agents import make_agent
+from docdelta.budget import Budget, BudgetExhausted, RateLimited
+from docdelta.conditions import CONDITIONS, DEFAULT_CONDITIONS, find_agent_docs
+from docdelta.models import load_repos, load_tasks
+from docdelta.report import badge, scorecard_markdown
+from docdelta.runner import MatrixConfig, UnreviewedTasks, load_results, run_matrix
+
+
+def _conditions(value: str) -> tuple[str, ...]:
+    names = tuple(part.strip() for part in value.split(",") if part.strip())
+    unknown = [name for name in names if name not in CONDITIONS]
+    if unknown or not names:
+        raise argparse.ArgumentTypeError(f"conditions must be from {CONDITIONS}, got {value!r}")
+    return names
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="docdelta", description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    run = sub.add_parser("run", help="run the task x condition x repeat matrix")
+    run.add_argument("--repos", type=Path, required=True, help="repos.json with pinned commits")
+    run.add_argument("--tasks", type=Path, required=True, help="directory of <repo>/<task>.json")
+    run.add_argument("--workdir", type=Path, required=True)
+    run.add_argument("--agent", default="doc-reader", help="doc-reader (free, fake) or opencode")
+    run.add_argument("--model", default="")
+    run.add_argument("--conditions", type=_conditions, default=DEFAULT_CONDITIONS)
+    run.add_argument("--repeats", type=int, default=3)
+    run.add_argument("--repo", action="append", default=[], help="limit to these repos")
+    run.add_argument("--task", action="append", default=[], help="limit to these task ids")
+    run.add_argument("--patch-dir", type=Path, default=None)
+    run.add_argument("--cap-usd", type=float, default=None)
+    run.add_argument("--reserve-usd", type=float, default=0.0)
+    run.add_argument("--cap-tokens", type=int, default=None)
+    run.add_argument("--reserve-tokens", type=int, default=400_000)
+    run.add_argument("--timeout", type=float, default=900.0)
+    run.add_argument("--keep-checkouts", action="store_true")
+    run.add_argument("--allow-unreviewed", action="store_true")
+
+    report = sub.add_parser("report", help="markdown scorecard from saved results")
+    report.add_argument("--workdir", type=Path, required=True)
+    report.add_argument("--repo", required=True)
+    report.add_argument("--out", type=Path, default=None)
+
+    badge_cmd = sub.add_parser("badge", help="shields.io endpoint JSON from saved results")
+    badge_cmd.add_argument("--workdir", type=Path, required=True)
+    badge_cmd.add_argument("--repo", required=True)
+    badge_cmd.add_argument("--out", type=Path, default=None)
+
+    docs = sub.add_parser("list-agent-docs", help="list the agent docs a checkout contains")
+    docs.add_argument("path", type=Path)
+    return parser
+
+
+def _emit(text: str, out: Path | None) -> None:
+    if out is None:
+        sys.stdout.write(text if text.endswith("\n") else text + "\n")
+    else:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    if args.command == "list-agent-docs":
+        _emit("\n".join(find_agent_docs(args.path)), None)
+        return 0
+    if args.command in ("report", "badge"):
+        results = load_results(args.workdir, args.repo)
+        if not results:
+            print(f"no results for {args.repo} under {args.workdir}", file=sys.stderr)
+            return 1
+        if args.command == "report":
+            _emit(scorecard_markdown(results, args.repo), args.out)
+        else:
+            _emit(json.dumps(badge(results), indent=1), args.out)
+        return 0
+
+    repos = load_repos(args.repos)
+    tasks = load_tasks(args.tasks, tuple(args.repo), tuple(args.task))
+    if not tasks:
+        print("no tasks selected", file=sys.stderr)
+        return 1
+    config = MatrixConfig(
+        workdir=args.workdir,
+        conditions=args.conditions,
+        repeats=args.repeats,
+        timeout_s=args.timeout,
+        patch_dir=args.patch_dir,
+        keep_checkouts=args.keep_checkouts,
+        allow_unreviewed=args.allow_unreviewed,
+    )
+    budget = Budget(
+        cap_tokens=args.cap_tokens,
+        reserve_tokens=args.reserve_tokens,
+        cap_usd=args.cap_usd,
+        reserve_usd=args.reserve_usd,
+    )
+    try:
+        agent = make_agent(args.agent, args.model)
+        results = run_matrix(tasks, repos, agent, config, budget)
+    except BudgetExhausted as exc:
+        print(f"stopped: budget: {exc}", file=sys.stderr)
+        return 2
+    except RateLimited as exc:
+        print(f"stopped: rate limited, not retrying: {exc}", file=sys.stderr)
+        return 3
+    except (UnreviewedTasks, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(
+        f"{len(results)} runs; spent {budget.used_tokens:,} tokens, ${budget.used_usd:.4f}",
+        file=sys.stderr,
+    )
+    return 0

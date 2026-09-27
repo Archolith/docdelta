@@ -1,0 +1,9 @@
+{
+  "repos": [
+    {
+      "name": "smolagents",
+      "url": "https://github.com/huggingface/smolagents.git",
+      "commit": "227ef5e49ddd82339295939072f0223249aa8d38"
+    }
+  ]
+}
