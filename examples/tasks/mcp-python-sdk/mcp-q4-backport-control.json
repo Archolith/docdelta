@@ -3,7 +3,7 @@
   "task_id": "mcp-q4-backport-control",
   "kind": "decision",
   "prompt": "A severe bug was fixed on `main`, and users still on the v1 SDK are affected. How does a fix reach v1 users: which branch does the change target, and what kinds of changes does that branch accept?",
-  "reviewed": false,
+  "reviewed": true,
   "gold": {
     "docs": [],
     "files": [],
@@ -51,5 +51,5 @@
       "quote": "The `v1.x` branch is the previous major's maintenance line and receives only security and critical bug fixes."
     }
   ],
-  "notes": "CONTROL: both answers are in CONTRIBUTING.md:99-107 (also VERSIONING.md:38, docs/migration.md:8) and AGENTS.md:21-23; conditions should tie. The `[v1.x]` title prefix (AGENTS.md:22, RELEASE.md:87) is deliberately not gold. gold.docs is empty so doc recall does not favour either file. Drafted by Claude 2026-09-27 from pinned commit f1b6589, revised after an Opus gold review; needs owner review before it counts."
+  "notes": "CONTROL: both answers are in CONTRIBUTING.md:99-107 (also VERSIONING.md:38, docs/migration.md:8) and AGENTS.md:21-23; conditions should tie. The `[v1.x]` title prefix (AGENTS.md:22, RELEASE.md:87) is deliberately not gold. gold.docs is empty so doc recall does not favour either file. Drafted by Claude 2026-09-27 from pinned commit f1b6589, revised after an Opus gold review; owner reviewed and approved 2026-09-27."
 }

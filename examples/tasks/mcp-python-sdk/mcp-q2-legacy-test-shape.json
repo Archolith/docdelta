@@ -3,7 +3,7 @@
   "task_id": "mcp-q2-legacy-test-shape",
   "kind": "first_plan",
   "prompt": "`PromptManager.remove_prompt` in `src/mcp/server/mcpserver/prompts/manager.py` raises `ValueError` for an unknown prompt name, but it has no tests. Add tests for removing a registered prompt and for removing an unknown one. Which file do the tests go in, what shape, names and docstrings should they have, and what command runs them?",
-  "reviewed": false,
+  "reviewed": true,
   "gold": {
     "docs": [
       "AGENTS.md"
@@ -98,5 +98,5 @@
       "quote": "**Docstrings: 1–2 sentences of behaviour, honest about provenance**"
     }
   ],
-  "notes": "Replaces the first Q2 (mcp-q2-async-test), which the target file answered by example. The target test file is class-only (`class TestPromptManager:`, test_manager.py:9, no top-level tests) with feature-style names (test_add_prompt) and 'Test adding ...' docstrings, so imitating it gives the wrong answer on all three points; AGENTS.md:72-74 and the test-quality skill (removed in without_docs with .claude/**) give the right one. Points 2-3 require the agent to follow AGENTS.md:68's pointer to the skill. Drafted by Claude 2026-09-27 from pinned commit f1b6589, revised after an Opus gold review; needs owner review before it counts."
+  "notes": "Replaces the first Q2 (mcp-q2-async-test), which the target file answered by example. The target test file is class-only (`class TestPromptManager:`, test_manager.py:9, no top-level tests) with feature-style names (test_add_prompt) and 'Test adding ...' docstrings, so imitating it gives the wrong answer on all three points; AGENTS.md:72-74 and the test-quality skill (removed in without_docs with .claude/**) give the right one. Points 2-3 require the agent to follow AGENTS.md:68's pointer to the skill. Drafted by Claude 2026-09-27 from pinned commit f1b6589, revised after an Opus gold review; owner reviewed and approved 2026-09-27."
 }

@@ -3,7 +3,7 @@
   "task_id": "mcp-q1-deps-and-checks",
   "kind": "commands_and_guardrails",
   "prompt": "You need to add the package `respx` to the project's dev dependency group, then run the tests in `tests/client/test_stdio.py` and type-check the project. What exact commands do you use, and what package-management rules does the project set?",
-  "reviewed": false,
+  "reviewed": true,
   "gold": {
     "docs": [
       "AGENTS.md"
@@ -111,5 +111,5 @@
       "quote": "FORBIDDEN: `uv pip install`, `@latest` syntax"
     }
   ],
-  "notes": "Clean AGENTS-only differentiators: guardrails 1 and 3 (never pip; `uv pip install` forbidden). `--frozen` is inferable without AGENTS.md (.pre-commit-config.yaml `uv run --frozen pyright`, scripts/test, .github/workflows/shared.yml, CONTRIBUTING.md:88), though CONTRIBUTING.md:116/122 show `uv run pytest`/`uv run pyright` without it. Gold `uv add` also matches a bare `uv add respx` (lenient; the matcher has no alternation). Drafted by Claude 2026-09-27 from pinned commit f1b6589, revised after an Opus gold review; needs owner review before it counts."
+  "notes": "Clean AGENTS-only differentiators: guardrails 1 and 3 (never pip; `uv pip install` forbidden). `--frozen` is inferable without AGENTS.md (.pre-commit-config.yaml `uv run --frozen pyright`, scripts/test, .github/workflows/shared.yml, CONTRIBUTING.md:88), though CONTRIBUTING.md:116/122 show `uv run pytest`/`uv run pyright` without it. Gold `uv add` also matches a bare `uv add respx` (lenient; the matcher has no alternation). Drafted by Claude 2026-09-27 from pinned commit f1b6589, revised after an Opus gold review; owner reviewed and approved 2026-09-27."
 }

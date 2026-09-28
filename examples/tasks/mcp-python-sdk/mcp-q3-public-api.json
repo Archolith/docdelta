@@ -3,7 +3,7 @@
   "task_id": "mcp-q3-public-api",
   "kind": "decision",
   "prompt": "You want to (a) export a new helper `format_tool_error` from the top-level `mcp` package and (b) add a required parameter to an existing public function in `src/mcp/client/session.py`. What project rules apply to each change, and what else must the same PR update?",
-  "reviewed": false,
+  "reviewed": true,
   "gold": {
     "docs": [
       "AGENTS.md"
@@ -92,5 +92,5 @@
       "quote": "changing a signature, return type, raised exception type, or documented behavior so that working code stops working"
     }
   ],
-  "notes": "Re-weighted toward AGENTS-only items: points 1-3. Point 1 is the strongest: VERSIONING.md:44 ('Every breaking change ... is documented in the Migration Guide') pushes a without-docs agent the wrong way. Point 4 is answerable from VERSIONING.md:15-23 in both conditions (kept for correctness; expect a tie on it). The __all__/new-public-API point was dropped: VERSIONING.md:11 and CONTRIBUTING.md:48-50 cover it. Drafted by Claude 2026-09-27 from pinned commit f1b6589, revised after an Opus gold review; needs owner review before it counts."
+  "notes": "Re-weighted toward AGENTS-only items: points 1-3. Point 1 is the strongest: VERSIONING.md:44 ('Every breaking change ... is documented in the Migration Guide') pushes a without-docs agent the wrong way. Point 4 is answerable from VERSIONING.md:15-23 in both conditions (kept for correctness; expect a tie on it). The __all__/new-public-API point was dropped: VERSIONING.md:11 and CONTRIBUTING.md:48-50 cover it. Drafted by Claude 2026-09-27 from pinned commit f1b6589, revised after an Opus gold review; owner reviewed and approved 2026-09-27."
 }
