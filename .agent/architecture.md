@@ -31,10 +31,25 @@ saved results only.
 
 ## Safety invariants
 
-- A condition changes only the checkout; prompt, tools and agent config are identical.
-- Docs are removed before sealing, so the agent's history never contains them.
-- Adapters must isolate the agent from the operator's global instruction files; otherwise
-  `without_docs` is contaminated.
-- Proposed commands never run on the host.
-- Rate limits and spend stops end the matrix; such runs are saved as `rate_limited.json` or
-  `stopped.json` and never reused as finished runs.
+- A condition changes only the checkout. The prompt, tools and agent config are identical, and the agent works in
+  a neutral temp path (`dd-*/repo`) that names no condition, task or workdir.
+- `without_docs` removes every file a harness auto-loads: instruction files, harness config, skill
+  and rule dirs (`conditions.AGENT_DOC_GLOBS`). On a case-insensitive filesystem, matching folds case, because
+  OpenCode's AGENTS.md lookup does too.
+- Docs are removed before sealing. Export and seal run without the operator's global/system git config,
+  hooks or templates, and export uses read-tree + checkout-index, not `git archive`.
+- The OpenCode adapter isolates `XDG_*` and HOME/USERPROFILE (not the Claude Code flag, which would hide a repo's
+  own CLAUDE.md in `with_docs`). It records injected instruction files per run, and a `without_docs` run
+  with any injected file is marked `contaminated` and excluded from reports.
+- A saved result is reused only if its `run_key` (docdelta version, agent, model, commit, condition, patch
+  and prompt hashes) matches; otherwise `StaleResults`.
+- Rate limits and spend stops (`over_reserve`, `no_usage`, `no_cost`, which includes a reported cost of 0) end the matrix.
+  A timeout is saved as stopped and the matrix continues. None of these runs is reused as finished. 429s are detected
+  only in error events and error-level lines.
+- Caps count the workdir's whole spend ledger (`spend.jsonl`), including stopped runs and earlier invocations.
+- Keys are redacted from the logs and from `final_text`/`error`, including on interrupt.
+- Reports use judged metrics only when every compared run was judged; judged verdicts must match the
+  saved answer.
+- Proposed commands never run on the host. **Not yet:** the agent itself still runs on the host with the
+  operator's environment and default-allow bash/edit/webfetch (audit F9). Sandbox it before testing
+  untrusted repos.

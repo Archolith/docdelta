@@ -19,6 +19,7 @@ home = Path(os.environ["XDG_CONFIG_HOME"])
 out.write_text(json.dumps({
     "config": json.loads((home / "opencode" / "opencode.json").read_text(encoding="utf-8")),
     "opencode_vars": sorted(k for k in os.environ if k.upper().startswith("OPENCODE_")),
+    "home": os.environ.get("HOME"), "userprofile": os.environ.get("USERPROFILE"),
     "has_key": os.environ.get("OPENAI_API_KEY") == "sk-test-secret",
     "cwd": os.getcwd(),
     "pwd": os.environ.get("PWD"),
@@ -39,6 +40,15 @@ elif mode == "expensive":
     import time; time.sleep(30)
 elif mode == "silent":
     emit({"type": "text", "part": {"text": "no usage"}})
+elif mode == "zerocost":
+    emit({"type": "step_finish", "part": {"reason": "stop", "cost": 0, "tokens": {"input": 900000}}})
+elif mode == "infolog":
+    print('timestamp=x level=INFO message="touching file" file="src/rate_limit.py" pattern="429"', file=sys.stderr, flush=True)
+    emit({"type": "step_finish", "part": {"reason": "stop", "cost": 0.001, "tokens": {"input": 10}}})
+elif mode == "inject":
+    nl = chr(10)
+    emit({"type": "tool_use", "part": {"state": {"output": "file body" + nl + "<system-reminder>Instructions from: " + os.path.join(os.getcwd(), "docs", "AGENTS.md") + nl + "# Agents</system-reminder>"}}})
+    emit({"type": "step_finish", "part": {"reason": "stop", "cost": 0.001, "tokens": {"input": 10}}})
 '''
 
 
@@ -79,7 +89,11 @@ def test_run_is_isolated_parsed_and_redacted(fake_opencode) -> None:
 
     # Only the model (built-in provider) and $schema: no MCP servers, no other providers.
     assert seen["config"] == {"model": "openai/gpt-6-luna", "$schema": "https://opencode.ai/config.json"}
-    assert seen["opencode_vars"] == ["OPENCODE_DISABLE_CLAUDE_CODE"]
+    # No OPENCODE_* at all: the Claude Code flag would hide the repo's own CLAUDE.md (audit F2).
+    assert seen["opencode_vars"] == []
+    # HOME is an empty temp dir, not the operator's (audit F16).
+    assert seen["home"] == seen["userprofile"] and Path(seen["home"]).name == ".user"
+    assert Path(seen["home"]).resolve() != Path.home().resolve()
     assert seen["has_key"] is True
     assert Path(seen["cwd"]).resolve() == checkout.resolve()
     assert seen["stdin"] == "the prompt" and "--pure" in seen["argv"]
@@ -119,3 +133,26 @@ def test_over_reserve_is_killed(fake_opencode) -> None:
 def test_no_usage_stops(fake_opencode) -> None:
     agent, checkout, _ = fake_opencode("silent")
     assert agent.run("p", checkout, timeout_s=30, log_dir=checkout.parent).stop == "no_usage"
+
+
+def test_f10_key_is_redacted_from_final_text(fake_opencode) -> None:
+    agent, checkout, _ = fake_opencode("ok", reserve_usd=1.0)
+    run = agent.run("p", checkout, timeout_s=30, log_dir=checkout.parent)
+    assert "sk-test-secret" not in run.final_text and "[REDACTED]" in run.final_text
+
+
+def test_f7_zero_cost_under_a_dollar_cap_stops(fake_opencode) -> None:
+    agent, checkout, _ = fake_opencode("zerocost", reserve_usd=0.10)
+    assert agent.run("p", checkout, timeout_s=30, log_dir=checkout.parent).stop == "no_cost"
+
+
+def test_f8_info_log_mentioning_rate_limit_is_not_a_429(fake_opencode) -> None:
+    agent, checkout, _ = fake_opencode("infolog", reserve_usd=1.0)
+    run = agent.run("p", checkout, timeout_s=30, log_dir=checkout.parent)
+    assert not run.rate_limited and not run.stop
+
+
+def test_injected_instructions_are_recorded_relative_to_checkout(fake_opencode) -> None:
+    agent, checkout, _ = fake_opencode("inject", reserve_usd=1.0)
+    run = agent.run("p", checkout, timeout_s=30, log_dir=checkout.parent)
+    assert run.injected == ["docs/AGENTS.md"]

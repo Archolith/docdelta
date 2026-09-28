@@ -33,8 +33,9 @@ def test_matrix_measures_the_docs(sample_repo: RepoPin, tmp_path: Path) -> None:
     assert by_condition["with_docs"].scores["command_recall"] == 1.0
     assert by_condition["with_docs"].scores["guardrail_recall"] == 1.0
     assert by_condition["without_docs"].scores["command_recall"] == 0.0
-    assert by_condition["without_docs"].changed_docs == ["AGENTS.md", "src/AGENTS.md"]
+    assert {"AGENTS.md", "src/AGENTS.md"} <= set(by_condition["without_docs"].changed_docs)
     assert not (run_dir(config.workdir, "sample", "sample-t1", "with_docs", 1) / "checkout").exists()
+    assert all(r.run_key["commit"] == sample_repo.commit for r in results)
 
     shown = badge(results)
     assert shown["message"].startswith("+1.00") and shown["color"] == "brightgreen"

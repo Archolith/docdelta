@@ -23,7 +23,17 @@ from docdelta.judge import (
 )
 from docdelta.models import load_repos, load_tasks
 from docdelta.report import badge, scorecard_markdown
-from docdelta.runner import MatrixConfig, UnreviewedTasks, load_results, run_matrix
+from docdelta.checkout import CheckoutError
+from docdelta.conditions import ConditionError
+from docdelta.agents.opencode import IsolationError
+from docdelta.runner import (
+    MatrixConfig,
+    StaleResults,
+    UnreviewedTasks,
+    load_results,
+    run_matrix,
+    spent_so_far,
+)
 
 
 def _conditions(value: str) -> tuple[str, ...]:
@@ -112,6 +122,9 @@ def main(argv: list[str] | None = None) -> int:
         except JudgeRateLimited as exc:
             print(f"stopped: judge rate limited, not retrying: {exc}", file=sys.stderr)
             return 3
+        except (RuntimeError, OSError) as exc:  # HTTP errors, network failures
+            print(f"error: judge failed: {exc}", file=sys.stderr)
+            return 1
         print(f"{count} runs judged; spent ${spent:.4f}", file=sys.stderr)
         return 0
     if args.command in ("report", "badge"):
@@ -139,11 +152,16 @@ def main(argv: list[str] | None = None) -> int:
         keep_checkouts=args.keep_checkouts,
         allow_unreviewed=args.allow_unreviewed,
     )
+    # Caps cover everything this workdir has spent, including earlier invocations and runs
+    # that were stopped or rate limited.
+    spent_tokens, spent_usd = spent_so_far(args.workdir)
     budget = Budget(
         cap_tokens=args.cap_tokens,
         reserve_tokens=args.reserve_tokens,
         cap_usd=args.cap_usd,
         reserve_usd=args.reserve_usd,
+        used_tokens=spent_tokens,
+        used_usd=spent_usd,
     )
     try:
         if args.agent != "doc-reader" and args.cap_usd is None and args.cap_tokens is None:
@@ -164,11 +182,14 @@ def main(argv: list[str] | None = None) -> int:
     except RateLimited as exc:
         print(f"stopped: rate limited, not retrying: {exc}", file=sys.stderr)
         return 3
-    except (UnreviewedTasks, ValueError) as exc:
+    except (UnreviewedTasks, StaleResults, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    except (CheckoutError, ConditionError, IsolationError, OSError) as exc:
+        print(f"error: setup failed: {exc}", file=sys.stderr)
+        return 1
     print(
-        f"{len(results)} runs; spent {budget.used_tokens:,} tokens, ${budget.used_usd:.4f}",
+        f"{len(results)} runs; workdir total spend {budget.used_tokens:,} tokens, ${budget.used_usd:.4f}",
         file=sys.stderr,
     )
     return 0

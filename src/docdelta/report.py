@@ -43,15 +43,47 @@ def is_judged(results: list[RunResult]) -> bool:
     )
 
 
+def comparable(results: list[RunResult]) -> tuple[list[RunResult], int]:
+    """The runs a report may compare, and how many were dropped as contaminated.
+
+    Contaminated runs (a without_docs run that still received agent instructions) are dropped.
+    A judged metric is kept only if every run that has its deterministic counterpart was
+    judged; otherwise it is removed from all runs, so a partially judged set never compares
+    judged scores in one condition with word-matched scores in another.
+    """
+    kept = [r for r in results if not r.contaminated]
+    dropped = len(results) - len(kept)
+    unusable = {
+        judged
+        for plain, judged in JUDGED.items()
+        if any(plain in r.scores and judged not in r.scores for r in kept)
+    }
+    if not unusable:
+        return kept, dropped
+    cleaned = []
+    for r in kept:
+        copy = RunResult.from_json(r.to_json())
+        copy.scores = {k: v for k, v in r.scores.items() if k not in unusable}
+        cleaned.append(copy)
+    return cleaned, dropped
+
+
 def token_change(
     results: list[RunResult], with_condition: str = WITH_DOCS, without_condition: str = WITHOUT_DOCS
 ) -> float | None:
-    """Median tokens with docs relative to without (-0.57 = 57% fewer); None if either is missing."""
-    with_tokens = [r.total_tokens for r in results if r.condition == with_condition]
-    without_tokens = [r.total_tokens for r in results if r.condition == without_condition]
-    if not with_tokens or not without_tokens or median(without_tokens) == 0:
-        return None
-    return median(with_tokens) / median(without_tokens) - 1
+    """Mean over tasks of (median tokens with docs / median without) - 1; -0.1 = 10% fewer.
+
+    Paired per task, so unequal run counts across tasks cannot skew it. None if no task has both.
+    """
+    ratios = []
+    for task in sorted({r.task_id for r in results}):
+        with_tokens = [r.total_tokens for r in results if r.task_id == task and r.condition == with_condition]
+        without_tokens = [
+            r.total_tokens for r in results if r.task_id == task and r.condition == without_condition
+        ]
+        if with_tokens and without_tokens and median(without_tokens) > 0:
+            ratios.append(median(with_tokens) / median(without_tokens))
+    return mean(ratios) - 1 if ratios else None
 
 
 @dataclass
@@ -110,6 +142,7 @@ def _fmt(value: float | None, digits: int = 2) -> str:
 
 
 def scorecard_markdown(results: list[RunResult], repo: str) -> str:
+    results, contaminated = comparable(results)
     summaries = summarize(results)
     lines = [
         f"# docdelta scorecard: {repo}",
@@ -143,10 +176,16 @@ def scorecard_markdown(results: list[RunResult], repo: str) -> str:
         "",
         "Answer score = mean of command, guardrail, key-point and verdict recall that each task's "
         f"gold defines. {scoring} Deltas within +/-{NOISE_BAND} are reported as no clear effect; "
-        "with few repeats even larger deltas can be noise. Tokens = change in median tokens per "
-        "run with docs versus without.",
+        "with few repeats even larger deltas can be noise. Tokens = mean per-task change in "
+        "median tokens per run with docs versus without.",
         "",
     ]
+    if contaminated:
+        lines += [
+            f"**Excluded:** {contaminated} without_docs run(s) in which the agent harness still "
+            "injected instruction files (see `injected` in their result.json).",
+            "",
+        ]
     return "\n".join(lines)
 
 
@@ -157,6 +196,7 @@ def badge(
     pass_threshold: float = 0.8,
 ) -> dict[str, object]:
     """A shields.io endpoint document: ``{"schemaVersion": 1, "label", "message", "color"}``."""
+    results, _ = comparable(results)
     tasks = per_task(results)
     label = "agent docs"
     if not tasks or any(
@@ -165,11 +205,15 @@ def badge(
         for per in tasks.values()
     ):
         return {"schemaVersion": 1, "label": label, "message": "insufficient runs", "color": "lightgrey"}
-    with_scores = [per[with_condition][0] for per in tasks.values() if per[with_condition][0] is not None]
-    without_scores = [
-        per[without_condition][0] for per in tasks.values() if per[without_condition][0] is not None
+    # Paired: only tasks scored in both conditions enter the delta.
+    pairs = [
+        (per[with_condition][0], per[without_condition][0])
+        for per in tasks.values()
+        if per[with_condition][0] is not None and per[without_condition][0] is not None
     ]
-    if not with_scores or not without_scores:
+    with_scores = [w for w, _ in pairs]
+    without_scores = [wo for _, wo in pairs]
+    if not pairs:
         return {"schemaVersion": 1, "label": label, "message": "no scored tasks", "color": "lightgrey"}
     delta = mean(with_scores) - mean(without_scores)
     passed = sum(1 for value in with_scores if value >= pass_threshold)

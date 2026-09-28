@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
@@ -17,11 +17,14 @@ class AgentRun:
     error: str = ""
     #: The provider answered 429 / rate limit. The matrix stops and never retries.
     rate_limited: bool = False
-    #: A reason the matrix must stop after this run: "over_reserve" (killed at its spend
-    #: reserve), "no_usage" or "no_cost" (spend cannot be accounted). Empty otherwise.
+    #: Why the run did not finish normally. Fatal (the matrix stops): "over_reserve" (killed at
+    #: its spend reserve), "no_usage" or "no_cost" (spend cannot be accounted). Non-fatal:
+    #: "timeout". Such runs are never reused as finished results. Empty otherwise.
     stop: str = ""
     tool_calls: int = 0
     resumes: int = 0
+    #: Instruction files the harness injected during the run (paths relative to the checkout).
+    injected: list[str] = field(default_factory=list)
 
 
 class AgentAdapter(Protocol):

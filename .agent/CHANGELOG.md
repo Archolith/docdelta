@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-09-27 - Audit fixes (0.0.2)
+
+Fixes for `.agent/reviews/docdelta-full-audit-results.md` in the workspace: F1-F8, F10, F11, F12, F13, F15, F16, F19,
+F21, F22 (grounding), F23 and F24. Each has a counterexample test (44 passing). Deferred: F9 (sandbox),
+F14 (partly addressed by neutral paths), F17 (docs corrected, re-measure pending), F18, F20, F25 (token change
+now paired per task), F26-F31.
+- `checkout.py`: neutral temp checkouts; git isolation (no global/system config, hooks or templates);
+  export via read-tree/checkout-index.
+- `conditions.py`: wider agent-doc globs; case-folding on case-insensitive filesystems.
+- `agents/opencode.py`: HOME isolation replaces the Claude Code flag; 429 detection only on error lines;
+  zero cost counts as `no_cost`; timeout counts as a non-fatal stop; redaction of `final_text`/`error` in `finally`; injected
+  instructions recorded.
+- `runner.py`: run key and `StaleResults`; spend ledger; stale `judged.json` removed on rerun; contaminated
+  flag; result glob restricted to run dirs.
+- `report.py`: `comparable()` (no mixed judging, contaminated runs excluded); paired deltas and token change.
+- `judge.py`: verdicts tied to the saved answer; SYSTEM_PROMPT in the digest; zero-usage guard; per-line grounding.
+- `cli.py`: budget seeded from the ledger; setup and judge errors reported cleanly.
+
 ## 2026-09-27 - Pointer patch; h1 reviewed; h2 dropped
 
 - h1 gold was owner-reviewed: the "sandboxed backend escape is in scope" point was dropped and the task marked

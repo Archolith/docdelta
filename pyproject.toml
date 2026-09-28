@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docdelta"
-version = "0.0.1"
+version = "0.0.2"
 description = "A/B test a repository's agent docs: run a coding agent with and without AGENTS.md and score the difference"
 license = "Apache-2.0"
 authors = [{name = "Charles Harvey"}]

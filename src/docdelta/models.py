@@ -85,6 +85,12 @@ class RunResult:
     stop: str = ""
     tool_calls: int = 0
     resumes: int = 0
+    #: Instruction files the harness injected during the run (relative to the checkout).
+    injected: list[str] = field(default_factory=list)
+    #: A without_docs run that still received agent instructions.
+    contaminated: bool = False
+    #: What decided the agent's input (agent, model, commit, condition, patch, prompt hashes).
+    run_key: dict[str, Any] = field(default_factory=dict)
 
     @property
     def total_tokens(self) -> int:

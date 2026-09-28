@@ -11,6 +11,7 @@ from docdelta.conditions import (
     WITH_DOCS,
     WITHOUT_DOCS,
     ConditionError,
+    case_insensitive,
     find_agent_docs,
     prepare,
 )
@@ -30,10 +31,12 @@ def test_finds_harness_files_but_not_human_docs(tmp_path: Path) -> None:
         path = tmp_path / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("x", encoding="utf-8")
-    assert find_agent_docs(tmp_path) == [
+    assert find_agent_docs(tmp_path, fold_case=False) == [
         ".clinerules", ".cursor/rules/style.mdc", ".github/copilot-instructions.md",
         "AGENTS.md", "CLAUDE.md", "pkg/AGENTS.md",
     ]
+    # On a case-insensitive filesystem the harness loads docs/agents.md as AGENTS.md (audit F4).
+    assert "docs/agents.md" in find_agent_docs(tmp_path, fold_case=True)
 
 
 def test_without_docs_removes_them_and_sealed_history_never_has_them(
@@ -42,8 +45,10 @@ def test_without_docs_removes_them_and_sealed_history_never_has_them(
     checkout = _export(sample_repo, tmp_path)
     removed = prepare(checkout, WITHOUT_DOCS)
     seal(checkout)
-    assert removed == ["AGENTS.md", "src/AGENTS.md"]
-    assert (checkout / "README.md").is_file() and (checkout / "docs/agents.md").is_file()
+    folded = case_insensitive(checkout)
+    assert removed == (["AGENTS.md", "docs/agents.md", "src/AGENTS.md"] if folded else ["AGENTS.md", "src/AGENTS.md"])
+    assert (checkout / "README.md").is_file()
+    assert (checkout / "docs/agents.md").is_file() is not folded
     tracked = subprocess.run(
         ["git", "log", "--all", "--name-only", "--format="],
         cwd=checkout, check=True, capture_output=True, text=True,

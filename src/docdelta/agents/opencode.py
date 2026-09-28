@@ -49,6 +49,26 @@ KILL_WAIT_S = 15.0
 PUMP_JOIN_S = 5.0
 DATA_DIR = ".data"
 STATE_DIR = ".state"
+USER_DIR = ".user"
+_ERROR_LINE = re.compile(r"level=(ERROR|FATAL)\b|^\s*(error|fatal)\b", re.IGNORECASE)
+_INJECTED = re.compile(r"Instructions from: ([^\n\r<]+)")
+
+
+def _is_error_line(line: str) -> bool:
+    """Only error-level lines can report a provider rate limit; INFO lines carry file paths
+    and grep patterns ("rate_limit.py", "429") that must not stop the matrix."""
+    return bool(_ERROR_LINE.search(line))
+
+
+def _strings(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for inner in value.values():
+            yield from _strings(inner)
+    elif isinstance(value, list):
+        for inner in value:
+            yield from _strings(inner)
 
 
 class IsolationError(RuntimeError):
@@ -111,7 +131,13 @@ def isolated_env(base: Mapping[str, str], home: Path, cwd: Path) -> dict[str, st
     env["XDG_CONFIG_HOME"] = str(home)
     env["XDG_DATA_HOME"] = str(home / DATA_DIR)
     env["XDG_STATE_HOME"] = str(home / STATE_DIR)
-    env["OPENCODE_DISABLE_CLAUDE_CODE"] = "1"
+    # HOME points at an empty directory, so the operator's ~/.claude/CLAUDE.md, ~/.agents/skills
+    # and ~/.opencode never reach the run. OPENCODE_DISABLE_CLAUDE_CODE is not used: it would
+    # also stop OpenCode loading the repo's own CLAUDE.md in with_docs.
+    env["HOME"] = str(home / USER_DIR)
+    env["USERPROFILE"] = str(home / USER_DIR)
+    for name in ("HOMEDRIVE", "HOMEPATH"):
+        env.pop(name, None)
     # An inherited PWD (Git Bash, MSYS) may root OpenCode in the caller's repository.
     env["PWD"] = str(cwd)
     return env
@@ -139,6 +165,7 @@ def isolated_home(config: dict[str, Any]) -> Iterator[Path]:
         (home / "opencode").mkdir()
         (home / "opencode" / "opencode.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
         (home / STATE_DIR).mkdir()
+        (home / USER_DIR).mkdir()
         _seed_ripgrep(home / DATA_DIR)
         yield home
     finally:
@@ -164,6 +191,8 @@ class EventLog:
     last_step_reason: str = ""
     errors: list[str] = field(default_factory=list)
     rate_limited: bool = False
+    #: Instruction files OpenCode injected mid-run ("Instructions from: <path>").
+    injected: list[str] = field(default_factory=list)
 
     @property
     def total_tokens(self) -> int:
@@ -176,7 +205,8 @@ class EventLog:
         try:
             event = json.loads(line)
         except json.JSONDecodeError:
-            self._scan(line)
+            if _is_error_line(line):
+                self._scan(line)
             return
         if not isinstance(event, dict):
             return
@@ -184,6 +214,11 @@ class EventLog:
         if isinstance(event.get("sessionID"), str) and not self.session_id:
             self.session_id = event["sessionID"]
         part = event.get("part") if isinstance(event.get("part"), dict) else {}
+        for text in _strings(part):
+            for match in _INJECTED.finditer(text):
+                path = match.group(1).strip()
+                if path not in self.injected:
+                    self.injected.append(path)
         if kind == "error" or "error" in event:
             message = json.dumps(event.get("error", event))[:500]
             self.errors.append(message)
@@ -206,7 +241,8 @@ class EventLog:
                 self.cost_events += 1
 
     def feed_stderr(self, line: str) -> None:
-        self._scan(line)
+        if _is_error_line(line):
+            self._scan(line)
 
     def _scan(self, text: str) -> None:
         if _RATE_LIMIT.search(text):
@@ -322,6 +358,21 @@ def stream_opencode(
     return log, reason, proc.returncode
 
 
+def redact_text(text: str, secrets: list[str]) -> str:
+    for secret in secrets:
+        if secret:
+            text = text.replace(secret, "[REDACTED]")
+    return text
+
+
+def _relative(path: str, cwd: Path) -> str:
+    """*path* relative to the checkout when it is inside it, POSIX-style."""
+    try:
+        return Path(path).resolve().relative_to(cwd.resolve()).as_posix()
+    except (ValueError, OSError):
+        return path
+
+
 def _redact(log_dir: Path, secrets: list[str]) -> None:
     for name in ("events.jsonl", "stderr.log"):
         path = log_dir / name
@@ -364,47 +415,57 @@ class OpenCodeAgent:
         cmd = [*self.opencode_cmd, "run", "--pure", "--print-logs", "--title", "docdelta",
                "-m", self.model, "--format", "json"]
         started = time.monotonic()
-        with isolated_home(config) as home:
-            env = isolated_env(os.environ, home, cwd)
-            env.update(self.keys)
-            log, reason, code = stream_opencode(
-                cmd, prompt, cwd, env, log_dir, timeout_s, self.reserve_tokens, self.reserve_usd
-            )
-            resumes = 0
-            # OpenCode's run mode sometimes exits right after a tool-calls step; resume it.
-            while (
-                not reason
-                and resumes < MAX_RESUMES
-                and log.last_step_reason == "tool-calls"
-                and log.session_id
-                and extract_answer("\n".join(log.texts)) is None
-            ):
-                resumes += 1
+        secrets = [value for value in self.keys.values() if value]
+        log, reason, code, resumes = EventLog(), "", None, 0
+        try:
+            with isolated_home(config) as home:
+                env = isolated_env(os.environ, home, cwd)
+                env.update(self.keys)
                 log, reason, code = stream_opencode(
-                    [*cmd, "--session", log.session_id], RESUME_PROMPT, cwd, env, log_dir,
-                    timeout_s, self.reserve_tokens, self.reserve_usd, log=log,
+                    cmd, prompt, cwd, env, log_dir, timeout_s, self.reserve_tokens, self.reserve_usd
                 )
-        _redact(log_dir, list(self.keys.values()))
+                # OpenCode's run mode sometimes exits right after a tool-calls step; resume it.
+                while (
+                    not reason
+                    and resumes < MAX_RESUMES
+                    and log.last_step_reason == "tool-calls"
+                    and log.session_id
+                    and extract_answer("\n".join(log.texts)) is None
+                ):
+                    resumes += 1
+                    log, reason, code = stream_opencode(
+                        [*cmd, "--session", log.session_id], RESUME_PROMPT, cwd, env, log_dir,
+                        timeout_s, self.reserve_tokens, self.reserve_usd, log=log,
+                    )
+        finally:
+            # Also on Ctrl+C: raw logs never stay on disk with a key in them.
+            _redact(log_dir, secrets)
 
         stop = ""
         if reason == "over_reserve":
             stop = "over_reserve"
+        elif reason == "timeout":
+            stop = "timeout"
         elif reason != "rate_limited" and log.usage_events == 0:
             stop = "no_usage"
-        elif reason != "rate_limited" and self.reserve_usd is not None and log.cost_events == 0:
+        elif reason != "rate_limited" and self.reserve_usd is not None and (
+            log.cost_events == 0 or log.cost_usd == 0.0
+        ):
+            # A provider reporting cost 0 (no price metadata) cannot keep a dollar cap.
             stop = "no_cost"
         error = reason or ("; ".join(log.errors) if log.errors else "")
         if not error and code not in (0, None):
             error = f"exit code {code}"
         return AgentRun(
-            final_text="\n".join(log.texts),
+            final_text=redact_text("\n".join(log.texts), secrets),
             input_tokens=log.input_tokens + log.cache_tokens,
             output_tokens=log.output_tokens,
             cost_usd=round(log.cost_usd, 6),
             seconds=round(time.monotonic() - started, 1),
-            error=(error or stop)[:500],
+            error=redact_text(error or stop, secrets)[:500],
             rate_limited=reason == "rate_limited",
             stop=stop,
             tool_calls=log.tool_calls,
             resumes=resumes,
+            injected=[_relative(path, cwd) for path in log.injected],
         )

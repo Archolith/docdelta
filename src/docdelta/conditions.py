@@ -1,16 +1,21 @@
 """The conditions a task runs under: the repo as committed, without its agent docs, or patched.
 
-Only files an agent harness auto-loads as instructions count as agent docs. Human docs
-(README, CONTRIBUTING, docs/) stay in every condition, so the measured difference is the
-agent docs alone. Matching is case-sensitive: ``docs/agents.md`` in a project about agents
-is a human page, not an instruction file.
+"Agent docs" are the files a coding-agent harness loads as instructions or configuration on its
+own: AGENTS.md, CLAUDE.md, CONTEXT.md, project OpenCode config, skills and rule directories of
+the common harnesses. Human docs (README, CONTRIBUTING, docs/) stay in every condition, so the
+measured difference is the agent docs alone.
+
+Matching follows the filesystem. On a case-insensitive filesystem (Windows, default macOS)
+OpenCode's lookup for ``AGENTS.md`` also finds ``docs/.../agents.md``, so there those count as
+agent docs too. Otherwise a ``without_docs`` run could still receive one as instructions.
 """
 
 from __future__ import annotations
 
-import os
 import subprocess
 from pathlib import Path
+
+from docdelta.checkout import isolated_git_env
 
 WITH_DOCS = "with_docs"
 WITHOUT_DOCS = "without_docs"
@@ -18,22 +23,38 @@ PATCHED = "patched"
 CONDITIONS = (WITH_DOCS, WITHOUT_DOCS, PATCHED)
 DEFAULT_CONDITIONS = (WITH_DOCS, WITHOUT_DOCS)
 
-#: ``**/NAME`` matches NAME at any depth; ``DIR/**`` matches everything under DIR.
+#: ``**/NAME`` matches NAME at any depth; ``DIR/**`` matches everything under DIR at the root;
+#: ``**/DIR/**`` matches everything under DIR at any depth; anything else is an exact root path.
 AGENT_DOC_GLOBS: tuple[str, ...] = (
+    # Instruction files OpenCode, Codex, Claude Code, Gemini and others auto-load.
     "**/AGENTS.md",
     "**/AGENTS.override.md",
+    "**/AGENT.md",
     "**/CLAUDE.md",
     "**/CLAUDE.local.md",
+    "**/CONTEXT.md",
     "**/GEMINI.md",
-    "**/gemini.md",
+    # Harness project config and extension directories (instructions, agents, skills, MCP).
+    "opencode.json",
+    "opencode.jsonc",
+    "**/.opencode/**",
+    "**/.agents/**",
+    "**/.claude/**",
+    ".mcp.json",
+    # Editor and assistant rule files.
     ".cursorrules",
     ".cursor/rules/**",
     ".windsurfrules",
     ".windsurf/rules/**",
     ".clinerules",
     ".clinerules/**",
+    ".roo/rules/**",
+    ".kiro/steering/**",
+    ".junie/guidelines.md",
     ".github/copilot-instructions.md",
     ".github/instructions/**",
+    ".github/prompts/**",
+    ".github/chatmodes/**",
 )
 
 
@@ -41,7 +62,22 @@ class ConditionError(RuntimeError):
     """A condition could not be prepared as specified."""
 
 
+def case_insensitive(root: Path) -> bool:
+    """Whether *root*'s filesystem ignores case, probed with a throwaway file."""
+    probe = root / ".docdelta-CaseProbe"
+    try:
+        probe.write_text("", encoding="utf-8")
+        return (root / ".docdelta-caseprobe").exists()
+    except OSError:
+        return False
+    finally:
+        probe.unlink(missing_ok=True)
+
+
 def _matches(rel: str, pattern: str) -> bool:
+    if pattern.startswith("**/") and pattern.endswith("/**"):
+        name = pattern[3:-3]
+        return rel.startswith(name + "/") or f"/{name}/" in rel
     if pattern.startswith("**/"):
         name = pattern[3:]
         return rel == name or rel.endswith("/" + name)
@@ -50,16 +86,23 @@ def _matches(rel: str, pattern: str) -> bool:
     return rel == pattern
 
 
-def find_agent_docs(root: Path, extra_globs: tuple[str, ...] = ()) -> list[str]:
-    """Repo-relative POSIX paths of the agent docs under *root*, sorted. ``.git`` is skipped."""
-    patterns = (*AGENT_DOC_GLOBS, *extra_globs)
+def find_agent_docs(
+    root: Path, extra_globs: tuple[str, ...] = (), fold_case: bool | None = None
+) -> list[str]:
+    """Repo-relative POSIX paths of the agent docs under *root*, sorted. ``.git`` is skipped.
+
+    *fold_case* defaults to what *root*'s filesystem does.
+    """
+    fold = case_insensitive(root) if fold_case is None else fold_case
+    patterns = tuple(p.casefold() if fold else p for p in (*AGENT_DOC_GLOBS, *extra_globs))
     found = []
     for path in root.rglob("*"):
         rel_parts = path.relative_to(root).parts
-        if ".git" in rel_parts or not path.is_file():
+        if not rel_parts or rel_parts[0] == ".git" or not path.is_file():
             continue
         rel = "/".join(rel_parts)
-        if any(_matches(rel, pattern) for pattern in patterns):
+        key = rel.casefold() if fold else rel
+        if any(_matches(key, pattern) for pattern in patterns):
             found.append(rel)
     return sorted(found)
 
@@ -87,9 +130,7 @@ def prepare(
             raise ConditionError(f"condition {PATCHED!r} needs a patch file, got {patch}")
         # The export is not a repository yet; the ceiling stops git from treating an enclosing
         # repository (the workdir may sit inside one) as the root the patch paths resolve against.
-        env = {**os.environ, "GIT_CEILING_DIRECTORIES": str(checkout.resolve().parent)}
-        env.pop("GIT_DIR", None)
-        env.pop("GIT_WORK_TREE", None)
+        env = isolated_git_env(ceiling=checkout.resolve().parent)
         patch_path = str(patch.resolve())
         try:
             stat = subprocess.run(

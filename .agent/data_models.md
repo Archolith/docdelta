@@ -9,7 +9,7 @@ All in `src/docdelta/models.py`.
 - **Task** `repo, task_id, kind, prompt, gold, reviewed`. Kinds: `TASK_KINDS`.
 - **RunResult** `repo, task_id, condition, repeat, answer, final_text, input_tokens,
   output_tokens, seconds, cost_usd, error, scores, changed_docs, command_checks, agent,
-  sealed_commit, rate_limited`.
+  sealed_commit, rate_limited, stop, tool_calls, resumes, injected, contaminated, run_key`.
 
 ## Files
 
@@ -17,6 +17,8 @@ All in `src/docdelta/models.py`.
 - `tasks/<repo>/<task_id>.json`: task plus `gold` and `gold_citations`
   (`{item, path, line_start, line_end, quote}`), beacon_eval format.
 - `<workdir>/cache/<repo>.git`: bare clone.
+- `<workdir>/spend.jsonl`: one line per paid run (`run`, `tokens`, `usd`), stopped runs included.
+- Checkouts: a temp `dd-*/repo` per run, deleted after scoring (copied to the run dir without `.git` with `--keep-checkouts`).
 - `<workdir>/runs/<repo>/<task>/<condition>/r<n>/`: `prompt.txt`, `result.json` or
   `rate_limited.json` or `stopped.json`, `judged.json` (judge verdicts and
   `guardrail_recall_judged` / `point_recall_judged`), `checkout/` only with `--keep-checkouts`.

@@ -135,7 +135,10 @@ def judge_item(call: Call, question: str, item: dict[str, Any], lines: list[str]
         data = {}
     raw_met = data.get("met") is True
     evidence = str(data.get("evidence") or "")
-    grounded = len(evidence.strip()) >= _MIN_EVIDENCE_CHARS and _norm(evidence) in _norm("\n".join(lines))
+    # Grounded in one answer entry (a passage straddling two entries doesn't count); a copied
+    # "- " list prefix from the prompt is tolerated.
+    quote = _norm(evidence.strip().removeprefix("- "))
+    grounded = len(quote) >= _MIN_EVIDENCE_CHARS and any(quote in _norm(line) for line in lines)
     return Verdict(
         item=item["wordings"][0],
         met=raw_met and grounded,
@@ -195,10 +198,16 @@ def openai_call(api_key: str, model: str, timeout_s: float = 60.0) -> Call:
 
 
 def _digest(model: str, answer: dict[str, Any] | None, ref: dict[str, Any]) -> str:
-    """Cache key: a change to the model, prompt version, answer, question or gold re-judges."""
+    """Cache key: a change to the model, judge prompt, answer, question or gold re-judges."""
     return hashlib.sha256(
-        json.dumps([JUDGE_PROMPT_VERSION, model, answer, ref], ensure_ascii=False, sort_keys=True).encode("utf-8")
+        json.dumps(
+            [JUDGE_PROMPT_VERSION, SYSTEM_PROMPT, model, answer, ref], ensure_ascii=False, sort_keys=True
+        ).encode("utf-8")
     ).hexdigest()
+
+
+def answer_hash(answer: dict[str, Any] | None) -> str:
+    return hashlib.sha256(json.dumps(answer, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def judge_workdir(
@@ -214,7 +223,7 @@ def judge_workdir(
     refs = load_references(task_root)
     spent = 0.0
     judged = 0
-    for path in sorted((workdir / "runs").rglob("result.json")):
+    for path in sorted((workdir / "runs").glob("*/*/*/r*/result.json")):
         result = json.loads(path.read_text(encoding="utf-8"))
         ref = refs.get((result["repo"], result["task_id"]))
         if ref is None or not any(ref["items"].values()):
@@ -244,6 +253,8 @@ def judge_workdir(
                         f"judge stopped at ${spent:.4f}: the next call could pass the ${budget_usd:.2f} cap"
                     )
                 verdict, usage = judge_item(call, ref["prompt"], item, lines)
+                if not usage.get("prompt_tokens") and not usage.get("completion_tokens"):
+                    raise JudgeBudgetExhausted("judge reported no token usage; the cap cannot be kept")
                 spent += call_cost(model, usage)
                 verdicts.append(verdict)
             one_passage_per_item(verdicts)
@@ -251,7 +262,8 @@ def judge_workdir(
             details[metric] = [asdict(v) for v in verdicts]
         cache.write_text(
             json.dumps(
-                {"model": model, "answer_sha256": digest, "scores": scores, "verdicts": details},
+                {"model": model, "answer_sha256": digest, "answer_only_sha256": answer_hash(answer),
+                 "scores": scores, "verdicts": details},
                 indent=1, ensure_ascii=False,
             ),
             encoding="utf-8",
@@ -260,10 +272,13 @@ def judge_workdir(
     return judged, spent
 
 
-def judged_scores(run_dir: Path) -> dict[str, float]:
-    """The judged metrics saved beside a run's result, or {} when it was not judged."""
+def judged_scores(run_dir: Path, answer: dict[str, Any] | None) -> dict[str, float]:
+    """The judged metrics saved beside a run's result, or {} when it was not judged or the
+    verdicts belong to a different answer (a stale ``judged.json`` from an earlier attempt)."""
     cache = run_dir / JUDGED_FILE
     if not cache.is_file():
         return {}
     data = json.loads(cache.read_text(encoding="utf-8"))
+    if data.get("answer_only_sha256") != answer_hash(answer):
+        return {}
     return {key: float(value) for key, value in (data.get("scores") or {}).items()}
