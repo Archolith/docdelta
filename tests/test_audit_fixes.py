@@ -175,3 +175,12 @@ def test_f21_result_json_inside_kept_checkout_is_ignored(sample_repo: RepoPin, t
     assert kept.is_dir()
     (kept / "result.json").write_text('{"not": "a run"}', encoding="utf-8")
     assert len(load_results(config.workdir)) == 2
+
+
+def test_nested_context_md_is_a_human_page_even_when_folding_case(tmp_path: Path) -> None:
+    # MCP python-sdk ships docs/handlers/context.md; only a root CONTEXT.md is loaded as instructions.
+    for rel in ("CONTEXT.md", "docs/handlers/context.md", "i18n/de/pages/handlers/context.md"):
+        path = tmp_path / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("x", encoding="utf-8")
+    assert find_agent_docs(tmp_path, fold_case=True) == ["CONTEXT.md"]

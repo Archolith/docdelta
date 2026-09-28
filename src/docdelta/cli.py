@@ -56,6 +56,8 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--model", default="", help="opencode model (default openai/gpt-6-luna)")
     run.add_argument("--env-file", type=Path, default=None,
                      help=".env whose *_API_KEY values reach only the agent process")
+    run.add_argument("--builtin-provider", action="store_true",
+                     help="use the model from OpenCode's built-in catalog without a key (free Zen models)")
     run.add_argument("--config-source", type=Path, default=None,
                      help="opencode.json to take the model's provider block from")
     run.add_argument("--conditions", type=_conditions, default=DEFAULT_CONDITIONS)
@@ -172,6 +174,7 @@ def main(argv: list[str] | None = None) -> int:
             args.model,
             env_file=args.env_file,
             config_source=args.config_source,
+            builtin_provider=args.builtin_provider,
             reserve_tokens=args.reserve_tokens if args.cap_tokens is not None else None,
             reserve_usd=args.reserve_usd if args.cap_usd is not None else None,
         )

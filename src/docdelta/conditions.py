@@ -32,7 +32,9 @@ AGENT_DOC_GLOBS: tuple[str, ...] = (
     "**/AGENT.md",
     "**/CLAUDE.md",
     "**/CLAUDE.local.md",
-    "**/CONTEXT.md",
+    # Root only: OpenCode finds CONTEXT.md from the project root up, never per subdirectory, and
+    # repos have human pages named context.md (e.g. MCP python-sdk docs/handlers/context.md).
+    "CONTEXT.md",
     "**/GEMINI.md",
     # Harness project config and extension directories (instructions, agents, skills, MCP).
     "opencode.json",

@@ -1,0 +1,95 @@
+{
+  "repo": "mcp-python-sdk",
+  "task_id": "mcp-q3-public-api",
+  "kind": "decision",
+  "prompt": "You want to (a) export a new helper `format_tool_error` from the top-level `mcp` package and (b) add a required parameter to an existing public function in `src/mcp/client/session.py`. What project rules apply to each change, and what else must the same PR update?",
+  "reviewed": false,
+  "gold": {
+    "docs": [
+      "AGENTS.md"
+    ],
+    "files": [
+      "src/mcp/__init__.py",
+      "src/mcp/client/session.py"
+    ],
+    "acceptable_files": [
+      "mkdocs.yml",
+      "docs/migration.md"
+    ],
+    "commands": [],
+    "allowed_flags": [],
+    "guardrails": [],
+    "points": [
+      [
+        "adding to __all__ is a deliberate API decision",
+        "__all__ defines the public API",
+        "not a convenience re-export"
+      ],
+      [
+        "changing an existing public signature needs an explicit maintainer decision",
+        "v2 public API is a compatibility contract",
+        "avoid breaking signature changes"
+      ],
+      [
+        "public APIs need docstrings with a Raises section",
+        "docstrings required",
+        "document raised exceptions"
+      ],
+      [
+        "docs/migration.md is closed to new entries",
+        "do not add to migration.md"
+      ],
+      [
+        "update the relevant docs pages under docs/ in the same PR",
+        "update docs in the same PR"
+      ]
+    ],
+    "risky": [],
+    "verdict": ""
+  },
+  "gold_citations": [
+    {
+      "item": "src/mcp/__init__.py",
+      "path": "AGENTS.md",
+      "line_start": 54,
+      "line_end": 55,
+      "quote": "`src/mcp/__init__.py` defines the public API surface via `__all__`."
+    },
+    {
+      "item": "adding to __all__ is a deliberate API decision",
+      "path": "AGENTS.md",
+      "line_start": 54,
+      "line_end": 55,
+      "quote": "Adding a symbol there is a deliberate API decision, not a convenience re-export."
+    },
+    {
+      "item": "changing an existing public signature needs an explicit maintainer decision",
+      "path": "AGENTS.md",
+      "line_start": 14,
+      "line_end": 18,
+      "quote": "its public API is a compatibility contract for the 2.x line"
+    },
+    {
+      "item": "public APIs need docstrings with a Raises section",
+      "path": "AGENTS.md",
+      "line_start": 51,
+      "line_end": 53,
+      "quote": "Public APIs must have docstrings."
+    },
+    {
+      "item": "docs/migration.md is closed to new entries",
+      "path": "AGENTS.md",
+      "line_start": 19,
+      "line_end": 20,
+      "quote": "`docs/migration.md` is the v1 -> v2 record and is closed to new entries."
+    },
+    {
+      "item": "update the relevant docs pages under docs/ in the same PR",
+      "path": "AGENTS.md",
+      "line_start": 144,
+      "line_end": 148,
+      "quote": "update the relevant page(s) under `docs/` in the same PR"
+    }
+  ],
+  "notes": "All points AGENTS-only. Drafted by Claude 2026-09-27 from the pinned commit; needs owner review before it counts."
+}

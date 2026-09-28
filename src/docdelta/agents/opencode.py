@@ -399,6 +399,7 @@ class OpenCodeAgent:
         opencode_cmd: list[str] | None = None,
         reserve_tokens: int | None = None,
         reserve_usd: float | None = None,
+        builtin_provider: bool = False,
     ) -> None:
         self.model = model
         self.keys = load_api_keys(env_file) if env_file is not None else {}
@@ -406,11 +407,13 @@ class OpenCodeAgent:
         self.opencode_cmd = opencode_cmd or resolve_opencode()
         self.reserve_tokens = reserve_tokens
         self.reserve_usd = reserve_usd
+        #: Use the model from OpenCode's built-in catalog (e.g. keyless Zen free models).
+        self.builtin_provider = builtin_provider
 
     def run(self, prompt: str, cwd: Path, *, timeout_s: float, log_dir: Path | None = None) -> AgentRun:
         cwd = cwd.resolve()
         log_dir = (log_dir or cwd.parent).resolve()
-        config = minimal_config(self.config_source, self.model, builtin_provider=bool(self.keys))
+        config = minimal_config(self.config_source, self.model, builtin_provider=self.builtin_provider or bool(self.keys))
         # --title skips OpenCode's title request, whose tokens no event reports.
         cmd = [*self.opencode_cmd, "run", "--pure", "--print-logs", "--title", "docdelta",
                "-m", self.model, "--format", "json"]

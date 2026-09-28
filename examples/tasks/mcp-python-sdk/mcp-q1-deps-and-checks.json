@@ -1,0 +1,104 @@
+{
+  "repo": "mcp-python-sdk",
+  "task_id": "mcp-q1-deps-and-checks",
+  "kind": "commands_and_guardrails",
+  "prompt": "You need to add the package `respx` to the project's dev dependency group, then run the tests in `tests/client/test_stdio.py` and type-check the project. What exact commands do you use, and what package-management rules does the project set?",
+  "reviewed": false,
+  "gold": {
+    "docs": [
+      "AGENTS.md"
+    ],
+    "files": [
+      "pyproject.toml",
+      "tests/client/test_stdio.py"
+    ],
+    "acceptable_files": [
+      "uv.lock",
+      "CONTRIBUTING.md"
+    ],
+    "commands": [
+      "uv add",
+      "uv run --frozen pytest",
+      "uv run --frozen pyright"
+    ],
+    "allowed_flags": [
+      "--dev",
+      "--group"
+    ],
+    "guardrails": [
+      [
+        "only use uv never pip",
+        "never pip",
+        "use uv not pip",
+        "no pip install"
+      ],
+      [
+        "always pass --frozen",
+        "--frozen so uv.lock is not rewritten",
+        "uv run --frozen"
+      ],
+      [
+        "uv pip install is forbidden",
+        "forbidden uv pip install",
+        "no uv pip install"
+      ]
+    ],
+    "points": [],
+    "risky": [
+      "pip install"
+    ],
+    "verdict": ""
+  },
+  "gold_citations": [
+    {
+      "item": "AGENTS.md",
+      "path": "AGENTS.md",
+      "line_start": 26,
+      "line_end": 40,
+      "quote": "ONLY use uv, NEVER pip"
+    },
+    {
+      "item": "uv add",
+      "path": "AGENTS.md",
+      "line_start": 29,
+      "line_end": 34,
+      "quote": "Dependency groups, extras, and the example packages still take plain `uv add`."
+    },
+    {
+      "item": "uv run --frozen pytest",
+      "path": "AGENTS.md",
+      "line_start": 70,
+      "line_end": 70,
+      "quote": "Framework: `uv run --frozen pytest`"
+    },
+    {
+      "item": "uv run --frozen pyright",
+      "path": "AGENTS.md",
+      "line_start": 154,
+      "line_end": 154,
+      "quote": "Type check: `uv run --frozen pyright`"
+    },
+    {
+      "item": "only use uv never pip",
+      "path": "AGENTS.md",
+      "line_start": 28,
+      "line_end": 28,
+      "quote": "ONLY use uv, NEVER pip"
+    },
+    {
+      "item": "always pass --frozen",
+      "path": "AGENTS.md",
+      "line_start": 35,
+      "line_end": 36,
+      "quote": "Always pass `--frozen` so uv doesn't rewrite `uv.lock` as a side effect."
+    },
+    {
+      "item": "uv pip install is forbidden",
+      "path": "AGENTS.md",
+      "line_start": 40,
+      "line_end": 40,
+      "quote": "FORBIDDEN: `uv pip install`, `@latest` syntax"
+    }
+  ],
+  "notes": "AGENTS-only rules: --frozen, never pip, uv pip forbidden. CONTRIBUTING.md shows `uv run pytest` without --frozen (line 116), which does not match the gold command. Drafted by Claude 2026-09-27 from the pinned commit; needs owner review before it counts."
+}

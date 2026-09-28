@@ -19,6 +19,7 @@ def make_agent(
     config_source: Path | None = None,
     reserve_tokens: int | None = None,
     reserve_usd: float | None = None,
+    builtin_provider: bool = False,
 ) -> AgentAdapter:
     if name == "doc-reader":
         return DocReadingAgent()
@@ -27,6 +28,7 @@ def make_agent(
             model or DEFAULT_MODEL,
             env_file=env_file,
             config_source=config_source,
+            builtin_provider=builtin_provider,
             reserve_tokens=reserve_tokens,
             reserve_usd=reserve_usd,
         )

@@ -1,0 +1,58 @@
+{
+  "repo": "mcp-python-sdk",
+  "task_id": "mcp-q4-backport-control",
+  "kind": "decision",
+  "prompt": "A severe bug was fixed on `main`, and users still on the v1 SDK are affected. How does a fix reach v1 users: which branch does the change target, and what kinds of changes does that branch accept?",
+  "reviewed": false,
+  "gold": {
+    "docs": [
+      "CONTRIBUTING.md"
+    ],
+    "files": [],
+    "acceptable_files": [
+      "AGENTS.md",
+      "RELEASE.md"
+    ],
+    "commands": [],
+    "allowed_flags": [],
+    "guardrails": [],
+    "points": [
+      [
+        "target the v1.x branch",
+        "backport to v1.x",
+        "v1.x maintenance branch"
+      ],
+      [
+        "v1.x only takes security fixes and critical bug fixes",
+        "only critical bug fixes and security fixes",
+        "security and critical bug fixes only"
+      ]
+    ],
+    "risky": [],
+    "verdict": ""
+  },
+  "gold_citations": [
+    {
+      "item": "CONTRIBUTING.md",
+      "path": "CONTRIBUTING.md",
+      "line_start": 99,
+      "line_end": 107,
+      "quote": "Choose the correct branch for your changes"
+    },
+    {
+      "item": "target the v1.x branch",
+      "path": "CONTRIBUTING.md",
+      "line_start": 104,
+      "line_end": 105,
+      "quote": "Critical bug fixes for v1 | `v1.x`"
+    },
+    {
+      "item": "v1.x only takes security fixes and critical bug fixes",
+      "path": "CONTRIBUTING.md",
+      "line_start": 107,
+      "line_end": 107,
+      "quote": "receives only security and critical bug fixes"
+    }
+  ],
+  "notes": "CONTROL: both answers are in CONTRIBUTING.md (99-107) and AGENTS.md (21-23); without_docs should score about the same. The AGENTS-only `[v1.x]` title prefix is deliberately not gold. Drafted by Claude 2026-09-27 from the pinned commit; needs owner review before it counts."
+}

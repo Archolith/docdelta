@@ -156,3 +156,13 @@ def test_injected_instructions_are_recorded_relative_to_checkout(fake_opencode) 
     agent, checkout, _ = fake_opencode("inject", reserve_usd=1.0)
     run = agent.run("p", checkout, timeout_s=30, log_dir=checkout.parent)
     assert run.injected == ["docs/AGENTS.md"]
+
+
+def test_builtin_provider_needs_no_key_or_config_entry(tmp_path: Path) -> None:
+    from docdelta.agents.opencode import IsolationError, minimal_config
+
+    source = tmp_path / "opencode.json"
+    source.write_text(json.dumps({"provider": {"deepseek": {}}}), encoding="utf-8")
+    with pytest.raises(IsolationError):
+        minimal_config(source, "opencode/big-pickle", builtin_provider=False)
+    assert minimal_config(source, "opencode/big-pickle", builtin_provider=True) == {"model": "opencode/big-pickle"}

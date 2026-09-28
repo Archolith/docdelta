@@ -4,6 +4,11 @@
       "name": "smolagents",
       "url": "https://github.com/huggingface/smolagents.git",
       "commit": "227ef5e49ddd82339295939072f0223249aa8d38"
+    },
+    {
+      "name": "mcp-python-sdk",
+      "url": "https://github.com/modelcontextprotocol/python-sdk.git",
+      "commit": "f1b6589088534632fef92238ee9750951e3c0185"
     }
   ]
 }
