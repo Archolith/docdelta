@@ -56,40 +56,47 @@ docdelta badge  --workdir work/real --repo smolagents --out badge.json
 
 `.env` holds `OPENAI_API_KEY`. Keys go only to the agent process and are scrubbed from saved logs.
 
-## Case study: smolagents (commit 227ef5e)
+## Case study: smolagents (commit 227ef5e): a result that did not replicate
 
-The task files are in `examples/tasks/smolagents/` and the patches in `examples/patches/`. One
-question asks how to contribute a small change to `LocalPythonExecutor` and which rules apply.
-Five runs per condition, gpt-6-luna through OpenCode 1.18.31:
+One question (`examples/tasks/smolagents/smolagents-t2-commands.json`) asks how to contribute a
+small change to `LocalPythonExecutor` and which rules apply. The agent is gpt-6-luna through OpenCode
+1.18.31, with 5 runs per condition. "Rules" means all 4 gold rules were named (LLM-judged).
+
+**First measurement (docdelta 0.0.1).** The current AGENTS.md named all 4 rules in 2/5 runs; without
+it, 5/5. It looked as if the three-line AGENTS.md made agents skip CONTRIBUTING.md's "open an
+issue first" and "disclose AI use".
+
+**An audit then found confounds in that harness:**
+- the agent's working path contained the condition name (`.../without_docs/...`);
+- OpenCode's case-insensitive AGENTS.md lookup injected a human docs page as instructions in some runs;
+- a "one-line" pointer patch that was actually two lines.
+
+**Re-measured in the fixed harness (docdelta 0.0.2):**
 
 | AGENTS.md | All 4 rules named | Median tokens |
 |---|---|---|
-| current file | 2/5 | 143k |
-| none | 5/5 | 158k |
-| current + two lines pointing to CONTRIBUTING.md and SECURITY.md | 5/5 | 105k |
-| current + a longer section restating the rules | 5/5 | 144k |
+| current file | 5/5 | 129k |
+| none | 5/5 | 285k |
+| current + one line pointing to CONTRIBUTING.md | 5/5 | 139k |
 
-With the current file, the agent missed "open an issue first" and "disclose AI assistant use" in
-CONTRIBUTING.md. It seems to treat AGENTS.md as the complete rulebook.
+The rules gap is gone. The first result was most likely noise or a harness artefact; this data can't
+tell which. The one difference left is tokens: with an AGENTS.md present, runs used about half the
+tokens. Token counts have been noisy across batches (an earlier batch showed −10%), though.
 
-**Correction (2026-09-27):** an earlier version of this table labelled the pointer row "one line".
-The patch measured was two lines (`examples/patches/pointer/smolagents.patch`). A held-out question
-about SECURITY.md was also run, but an audit found it confounded: on Windows, OpenCode's
-case-insensitive AGENTS.md lookup injected `docs/.../agents.md` as instructions in some runs. That
-result is withdrawn.
+In 2 of the 5 `with_docs` runs, OpenCode injected `docs/source/en/reference/agents.md` as
+instructions (Windows, case-insensitive lookup). That's what a Windows user of OpenCode would get, so
+it is left in `with_docs` and recorded per run. It is removed from `without_docs`.
 
-An audit also found that the agent could see its condition name in its working path. The harness is
-being fixed, and these numbers will be re-measured, with a true one-line patch, in the fixed harness.
+The lesson is the method: five runs and one question can produce a convincing, wrong story. Re-measure
+after any harness change before acting on a result. Raw results live in local workdirs and are not
+published.
 
-This is one question with one model and five runs. Treat it as a worked example of the method,
-not a benchmark.
-
-Reproduce it:
+Reproduce:
 
 ```bash
-docdelta run ... --task smolagents-t2-commands --conditions with_docs,without_docs
-docdelta run ... --workdir work/pointer --task smolagents-t2-commands \
-  --conditions patched --patch-dir examples/patches/pointer
+docdelta run --agent opencode --model openai/gpt-6-luna --env-file .env   --repos examples/repos.json --tasks examples/tasks --workdir work/v2   --task smolagents-t2-commands --conditions with_docs,without_docs,patched   --patch-dir examples/patches/one-line --repeats 5 --cap-usd 0.25 --reserve-usd 0.05
+docdelta judge --workdir work/v2 --tasks examples/tasks --env-file .env --cap-usd 0.03
+docdelta report --workdir work/v2 --repo smolagents
 ```
 
 ## Task files

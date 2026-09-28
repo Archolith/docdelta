@@ -1,5 +1,5 @@
 <!--
-DRAFT for huggingface/smolagents. Not posted. ON HOLD 2026-09-27: the audit found the pointer row was a two-line patch and the harness leaked the condition name into paths; the numbers below are being re-measured before posting. The owner reviews, edits and posts it personally.
+DRAFT for huggingface/smolagents. Not posted. DO NOT POST (2026-09-27): re-measured in the fixed harness (docdelta 0.0.2), the current AGENTS.md named all 4 rules in 5/5 runs, so the 2/5 gap below did not replicate. Kept only as a record. The owner reviews, edits and posts it personally.
 Checked 2026-09-27:
 - main == 227ef5e (the commit measured);
 - no open issue about AGENTS.md;
