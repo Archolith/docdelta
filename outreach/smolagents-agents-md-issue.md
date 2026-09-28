@@ -55,9 +55,12 @@ can open the PR if you label this `status:accepted`. Or feel free to just make t
   - A longer patch that restated the rules helped on this question but not on a held-out question about `SECURITY.md`.
   - A second pointer line to `SECURITY.md` didn't help that question either.
   - So I'm only proposing the CONTRIBUTING.md line.
-- I can share the raw runs (prompts, transcripts, scores) if useful.
+- **Source:** the harness, the task and gold files, and both patches are public:
+  https://github.com/Archolith/docdelta/tree/7e6e67fed30f7d281fc7e2a28354a64f6648d612/examples.
+  The task for the table above is `examples/tasks/smolagents/smolagents-t2-commands.json`. I can also
+  share the raw runs (prompts, transcripts, scores).
 
 ### Disclosure
 
-I measured this with a small A/B tool I'm building for agent instruction files. An AI assistant helped run the
+I measured this with docdelta (linked above), a small open-source A/B tool I'm building for agent instruction files. An AI assistant helped run the
 experiments and draft this issue. I've read the results and the diff and stand behind them.
