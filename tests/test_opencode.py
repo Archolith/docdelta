@@ -199,6 +199,13 @@ def test_wait_mode_gives_up_when_the_limit_never_clears(fake_opencode) -> None:
     assert run.rate_limited and run.seconds < 8
 
 
+def test_wait_mode_timeout_during_rate_limit_retries_is_rate_limited(fake_opencode) -> None:
+    # Run timeout shorter than the rate-limit wait: the timeout must not hide the rate limit.
+    agent, checkout, _ = fake_opencode("ratelimit_forever", rate_limit_wait_s=30)
+    run = agent.run("p", checkout, timeout_s=1.5, log_dir=checkout.parent)
+    assert run.rate_limited and run.stop == ""
+
+
 def test_wait_mode_opencode_exiting_on_a_rate_limit_is_rate_limited(fake_opencode) -> None:
     agent, checkout, _ = fake_opencode("ratelimit_exit", rate_limit_wait_s=30)
     run = agent.run("p", checkout, timeout_s=60, log_dir=checkout.parent)

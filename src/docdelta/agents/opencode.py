@@ -486,8 +486,14 @@ class OpenCodeAgent:
             # Also on Ctrl+C: raw logs never stay on disk with a key in them.
             _redact(log_dir, secrets)
 
-        # OpenCode exited after rate-limit errors without an answer: its retries ran out.
-        if not reason and log.rate_limited and extract_answer("\n".join(log.texts)) is None:
+        # A run that ended without an answer while OpenCode was still hitting rate limits is
+        # rate-limited, not finished or timed out: either its retries ran out (exit), or they
+        # outlasted the run timeout (seen 2026-09-28: nine 20-min "timeouts" of a spent quota).
+        if (
+            reason in ("", "timeout")
+            and log.rate_limited
+            and extract_answer("\n".join(log.texts)) is None
+        ):
             reason = "rate_limited"
         stop = ""
         if reason == "over_reserve":
