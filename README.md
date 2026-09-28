@@ -66,14 +66,20 @@ Five runs per condition, gpt-6-luna through OpenCode 1.18.31:
 |---|---|---|
 | current file | 2/5 | 143k |
 | none | 5/5 | 158k |
-| current + one line pointing to CONTRIBUTING.md | 5/5 | 105k |
+| current + two lines pointing to CONTRIBUTING.md and SECURITY.md | 5/5 | 105k |
 | current + a longer section restating the rules | 5/5 | 144k |
 
 With the current file, the agent missed "open an issue first" and "disclose AI assistant use" in
 CONTRIBUTING.md. It seems to treat AGENTS.md as the complete rulebook.
 
-A held-out question about SECURITY.md showed no benefit from either patch; the pointer did
-slightly worse. So the only supported change is the one-line pointer to CONTRIBUTING.md.
+**Correction (2026-09-27):** an earlier version of this table labelled the pointer row "one line".
+The patch measured was two lines (`examples/patches/pointer/smolagents.patch`). A held-out question
+about SECURITY.md was also run, but an audit found it confounded: on Windows, OpenCode's
+case-insensitive AGENTS.md lookup injected `docs/.../agents.md` as instructions in some runs. That
+result is withdrawn.
+
+An audit also found that the agent could see its condition name in its working path. The harness is
+being fixed, and these numbers will be re-measured, with a true one-line patch, in the fixed harness.
 
 This is one question with one model and five runs. Treat it as a worked example of the method,
 not a benchmark.
