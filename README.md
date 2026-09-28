@@ -33,8 +33,10 @@ what it gets right, so you can test an AGENTS.md change the way you would test c
    judge rule and key-point recall; it gives credit only when it can quote the answer.
 6. Save `runs/<repo>/<task>/<condition>/r<n>/result.json` (plus `judged.json`).
 
-Spend caps are checked before every run and a per-run reserve kills runaway runs. A rate limit
-stops everything and is never retried. Saved results are reused, so an interrupted run resumes.
+Spend caps are checked before every run and a per-run reserve kills runaway runs. By default a
+rate limit stops everything and is never retried. With `--rate-limit wait`, meant for free models, the
+agent harness's own back-off is allowed to run. A run that still fails is then retried after waits
+of 5, 15 and 45 minutes, each logged in `ratelimit.log`, before the matrix stops. Saved results are reused, so an interrupted run resumes.
 
 ## Quick start
 

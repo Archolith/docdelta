@@ -91,6 +91,8 @@ class RunResult:
     contaminated: bool = False
     #: What decided the agent's input (agent, model, commit, condition, patch, prompt hashes).
     run_key: dict[str, Any] = field(default_factory=dict)
+    #: Rate-limit errors seen during the run (a run can succeed after the harness retried past them).
+    rate_limit_hits: int = 0
 
     @property
     def total_tokens(self) -> int:

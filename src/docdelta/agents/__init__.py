@@ -20,6 +20,7 @@ def make_agent(
     reserve_tokens: int | None = None,
     reserve_usd: float | None = None,
     builtin_provider: bool = False,
+    rate_limit_wait_s: float | None = None,
 ) -> AgentAdapter:
     if name == "doc-reader":
         return DocReadingAgent()
@@ -29,6 +30,7 @@ def make_agent(
             env_file=env_file,
             config_source=config_source,
             builtin_provider=builtin_provider,
+            rate_limit_wait_s=rate_limit_wait_s,
             reserve_tokens=reserve_tokens,
             reserve_usd=reserve_usd,
         )

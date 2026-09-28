@@ -71,6 +71,15 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--cap-tokens", type=int, default=None)
     run.add_argument("--reserve-tokens", type=int, default=400_000)
     run.add_argument("--timeout", type=float, default=900.0)
+    run.add_argument(
+        "--rate-limit", choices=("stop", "wait"), default="stop",
+        help="stop (default): end the matrix at the first rate limit, never retry. wait: let the "
+             "agent harness back off, then wait between retries of the run (meant for free models)",
+    )
+    run.add_argument("--rate-limit-run-wait", type=float, default=1800.0,
+                     help="wait mode: seconds the harness may keep retrying inside one run")
+    run.add_argument("--rate-limit-backoff", default="300,900,2700",
+                     help="wait mode: comma-separated seconds to wait before each retry of a rate-limited run")
     run.add_argument("--keep-checkouts", action="store_true")
     run.add_argument("--allow-unreviewed", action="store_true")
 
@@ -153,6 +162,11 @@ def main(argv: list[str] | None = None) -> int:
         patch_dir=args.patch_dir,
         keep_checkouts=args.keep_checkouts,
         allow_unreviewed=args.allow_unreviewed,
+        rate_limit_backoff=(
+            tuple(float(x) for x in args.rate_limit_backoff.split(",") if x.strip())
+            if args.rate_limit == "wait"
+            else ()
+        ),
     )
     # Caps cover everything this workdir has spent, including earlier invocations and runs
     # that were stopped or rate limited.
@@ -175,6 +189,7 @@ def main(argv: list[str] | None = None) -> int:
             env_file=args.env_file,
             config_source=args.config_source,
             builtin_provider=args.builtin_provider,
+            rate_limit_wait_s=args.rate_limit_run_wait if args.rate_limit == "wait" else None,
             reserve_tokens=args.reserve_tokens if args.cap_tokens is not None else None,
             reserve_usd=args.reserve_usd if args.cap_usd is not None else None,
         )

@@ -190,13 +190,22 @@ class EventLog:
     session_id: str = ""
     last_step_reason: str = ""
     errors: list[str] = field(default_factory=list)
-    rate_limited: bool = False
+    #: Error-level log lines reporting a rate limit. OpenCode logs one per failed attempt and
+    #: may retry by itself (the AI SDK treats 429 as retryable and honours retry-after).
+    rate_limit_logged: int = 0
+    first_rate_limit_at: float | None = None
+    #: A rate limit surfaced as an error event: OpenCode gave up on it.
+    rate_limit_final: bool = False
     #: Instruction files OpenCode injected mid-run ("Instructions from: <path>").
     injected: list[str] = field(default_factory=list)
 
     @property
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens + self.cache_tokens
+
+    @property
+    def rate_limited(self) -> bool:
+        return self.rate_limit_final or self.rate_limit_logged > 0
 
     def feed(self, line: str) -> None:
         line = line.strip()
@@ -206,7 +215,7 @@ class EventLog:
             event = json.loads(line)
         except json.JSONDecodeError:
             if _is_error_line(line):
-                self._scan(line)
+                self._scan(line, final=False)
             return
         if not isinstance(event, dict):
             return
@@ -222,7 +231,7 @@ class EventLog:
         if kind == "error" or "error" in event:
             message = json.dumps(event.get("error", event))[:500]
             self.errors.append(message)
-            self._scan(message)
+            self._scan(message, final=True)
         elif kind == "text" and isinstance(part.get("text"), str):
             self.texts.append(part["text"])
         elif kind == "tool_use":
@@ -242,11 +251,32 @@ class EventLog:
 
     def feed_stderr(self, line: str) -> None:
         if _is_error_line(line):
-            self._scan(line)
+            self._scan(line, final=False)
 
-    def _scan(self, text: str) -> None:
-        if _RATE_LIMIT.search(text):
-            self.rate_limited = True
+    def _scan(self, text: str, final: bool) -> None:
+        if not _RATE_LIMIT.search(text):
+            return
+        if final:
+            self.rate_limit_final = True
+            return
+        self.rate_limit_logged += 1
+        if self.first_rate_limit_at is None:
+            self.first_rate_limit_at = time.monotonic()
+
+    def rate_limit_stop(self, wait_s: float | None) -> bool:
+        """Whether the run must stop for a rate limit now.
+
+        *wait_s* None (stop mode): at the first sign of one. Otherwise only when OpenCode gave up
+        (an error event) or its own retries have been failing for longer than *wait_s*.
+        """
+        if self.rate_limit_final:
+            return True
+        if not self.rate_limit_logged:
+            return False
+        if wait_s is None:
+            return True
+        assert self.first_rate_limit_at is not None
+        return time.monotonic() - self.first_rate_limit_at > wait_s
 
 
 def _pump(stream: IO[str], tag: str, sink: queue.Queue[tuple[str, str | None]]) -> None:
@@ -293,11 +323,14 @@ def stream_opencode(
     reserve_tokens: int | None,
     reserve_usd: float | None,
     log: EventLog | None = None,
+    rate_limit_wait_s: float | None = None,
 ) -> tuple[EventLog, str, int | None]:
     """Run OpenCode once; returns (log, stop reason, exit code).
 
     Stop reasons: "" (finished), "rate_limited", "over_reserve", "timeout". Passing *log*
     continues a resumed session: limits apply to running totals and log files are appended.
+    *rate_limit_wait_s* None stops at the first rate-limit sign; a number lets OpenCode's own
+    retries run for that long (see :meth:`EventLog.rate_limit_stop`).
     """
     mode = "a" if log is not None else "w"
     log = log if log is not None else EventLog()
@@ -330,6 +363,10 @@ def stream_opencode(
                 if remaining <= 0:
                     reason = "timeout"
                     break
+                # Checked on every tick, not only on new output: a retrying OpenCode may be silent.
+                if log.rate_limit_stop(rate_limit_wait_s):
+                    reason = "rate_limited"
+                    break
                 try:
                     tag, line = lines.get(timeout=min(remaining, 1.0))
                 except queue.Empty:
@@ -343,7 +380,7 @@ def stream_opencode(
                 else:
                     errors.write(line)
                     log.feed_stderr(line)
-                if log.rate_limited:
+                if log.rate_limit_stop(rate_limit_wait_s):
                     reason = "rate_limited"
                     break
                 if (reserve_tokens is not None and log.total_tokens > reserve_tokens) or (
@@ -400,6 +437,7 @@ class OpenCodeAgent:
         reserve_tokens: int | None = None,
         reserve_usd: float | None = None,
         builtin_provider: bool = False,
+        rate_limit_wait_s: float | None = None,
     ) -> None:
         self.model = model
         self.keys = load_api_keys(env_file) if env_file is not None else {}
@@ -409,6 +447,8 @@ class OpenCodeAgent:
         self.reserve_usd = reserve_usd
         #: Use the model from OpenCode's built-in catalog (e.g. keyless Zen free models).
         self.builtin_provider = builtin_provider
+        #: None: stop at the first rate-limit sign. Seconds: let OpenCode's own retries run that long.
+        self.rate_limit_wait_s = rate_limit_wait_s
 
     def run(self, prompt: str, cwd: Path, *, timeout_s: float, log_dir: Path | None = None) -> AgentRun:
         cwd = cwd.resolve()
@@ -425,7 +465,8 @@ class OpenCodeAgent:
                 env = isolated_env(os.environ, home, cwd)
                 env.update(self.keys)
                 log, reason, code = stream_opencode(
-                    cmd, prompt, cwd, env, log_dir, timeout_s, self.reserve_tokens, self.reserve_usd
+                    cmd, prompt, cwd, env, log_dir, timeout_s, self.reserve_tokens, self.reserve_usd,
+                    rate_limit_wait_s=self.rate_limit_wait_s,
                 )
                 # OpenCode's run mode sometimes exits right after a tool-calls step; resume it.
                 while (
@@ -439,11 +480,15 @@ class OpenCodeAgent:
                     log, reason, code = stream_opencode(
                         [*cmd, "--session", log.session_id], RESUME_PROMPT, cwd, env, log_dir,
                         timeout_s, self.reserve_tokens, self.reserve_usd, log=log,
+                        rate_limit_wait_s=self.rate_limit_wait_s,
                     )
         finally:
             # Also on Ctrl+C: raw logs never stay on disk with a key in them.
             _redact(log_dir, secrets)
 
+        # OpenCode exited after rate-limit errors without an answer: its retries ran out.
+        if not reason and log.rate_limited and extract_answer("\n".join(log.texts)) is None:
+            reason = "rate_limited"
         stop = ""
         if reason == "over_reserve":
             stop = "over_reserve"
@@ -471,4 +516,5 @@ class OpenCodeAgent:
             tool_calls=log.tool_calls,
             resumes=resumes,
             injected=[_relative(path, cwd) for path in log.injected],
+            rate_limit_hits=log.rate_limit_logged + int(log.rate_limit_final),
         )

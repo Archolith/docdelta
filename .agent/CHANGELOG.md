@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-09-28 - Opt-in rate-limit wait mode
+
+- `agents/opencode.py`: `rate_limit_wait_s`. In wait mode, error-level rate-limit log lines no longer kill OpenCode, so its own
+  retry and back-off (the AI SDK treats 429 as retryable and honours retry-after) can run.
+  - The run stops only when OpenCode surfaces the error as an event, when its retries fail for longer than the wait, or when it exits with no answer.
+  - The per-run hit count is recorded as `rate_limit_hits`.
+- `runner.py`: `rate_limit_backoff`. A rate-limited run is retried after each listed wait, then the matrix stops. Every
+  wait and the final stop are logged in `<workdir>/ratelimit.log`.
+- `cli.py`: `--rate-limit stop|wait` (default stop), `--rate-limit-run-wait` (1800), `--rate-limit-backoff` (300,900,2700).
+- Tests:
+  - adapter: a 429 then success, a 429 that never clears, OpenCode exiting on a 429, and stop mode unchanged;
+  - runner: wait then retry, waits exhausted, default never waits.
+
 ## 2026-09-28 - MCP python-sdk case study (Big Pickle)
 
 - Batch 1 (40 runs, judged, $0.02 for the judge; free agent), with vs without docs:

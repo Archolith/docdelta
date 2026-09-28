@@ -43,7 +43,11 @@ saved results only.
   with any injected file is marked `contaminated` and excluded from reports.
 - A saved result is reused only if its `run_key` (docdelta version, agent, model, commit, condition, patch
   and prompt hashes) matches; otherwise `StaleResults`.
-- Rate limits and spend stops (`over_reserve`, `no_usage`, `no_cost`, which includes a reported cost of 0) end the matrix.
+- Rate limits: by default (`--rate-limit stop`) the first sign of one ends the matrix, and nothing is retried. `--rate-limit wait`
+  (opt-in, meant for free models) lets OpenCode's own retry and back-off run for up to `--rate-limit-run-wait` seconds per run. If a
+  run still ends rate-limited, the matrix waits the `--rate-limit-backoff` delays (default 5/15/45 min) and retries it, then stops.
+  Every wait is logged in `ratelimit.log`.
+- Spend stops (`over_reserve`, `no_usage`, `no_cost`, which includes a reported cost of 0) end the matrix.
   A timeout is saved as stopped and the matrix continues. None of these runs is reused as finished. 429s are detected
   only in error events and error-level lines.
 - Caps count the workdir's whole spend ledger (`spend.jsonl`), including stopped runs and earlier invocations.

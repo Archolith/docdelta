@@ -18,9 +18,12 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Callable
+from datetime import datetime, timezone
 from typing import Any
 
 from docdelta import __version__
@@ -72,6 +75,11 @@ class MatrixConfig:
     patch_dir: Path | None = None
     keep_checkouts: bool = False
     allow_unreviewed: bool = False
+    #: Seconds to wait before retrying a rate-limited run, one entry per retry. Empty (the
+    #: default) stops the matrix at the first rate-limited run.
+    rate_limit_backoff: tuple[float, ...] = ()
+    #: Injected for tests; the real matrix sleeps.
+    sleep: Callable[[float], None] = time.sleep
 
 
 def build_prompt(task: Task) -> str:
@@ -110,6 +118,20 @@ def _record_spend(workdir: Path, where: str, tokens: int, usd: float) -> None:
     workdir.mkdir(parents=True, exist_ok=True)
     with (workdir / LEDGER_FILE).open("a", encoding="utf-8") as ledger:
         ledger.write(json.dumps({"run": where, "tokens": tokens, "usd": usd}) + "\n")
+
+
+RATE_LIMIT_LOG = "ratelimit.log"
+
+
+def _log_rate_limit(workdir: Path, where: str, attempt: int, wait: float | None, error: str) -> None:
+    """One line per rate-limited attempt, to ``ratelimit.log`` and stderr: when, which run, what next."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    action = f"waiting {wait:.0f}s before retry {attempt + 1}" if wait is not None else "giving up; matrix stops"
+    line = f"{now} {where} rate limited ({error}); {action}"
+    workdir.mkdir(parents=True, exist_ok=True)
+    with (workdir / RATE_LIMIT_LOG).open("a", encoding="utf-8") as log:
+        log.write(line + "\n")
+    print(line, file=sys.stderr)
 
 
 def spent_so_far(workdir: Path) -> tuple[int, float]:
@@ -193,6 +215,7 @@ def run_one(
         # Agent instructions reaching a without_docs run make it measure the wrong thing.
         contaminated=condition == WITHOUT_DOCS and bool(run.injected),
         run_key=key,
+        rate_limit_hits=run.rate_limit_hits,
     )
     # A rate-limited or stopped run is kept for the record but never reused as finished.
     if run.rate_limited:
@@ -263,12 +286,23 @@ def run_matrix(
                         )
                     results.append(prior)
                     continue
-                budget.check()
-                result = run_one(task, pin, condition, repeat, agent, config, executor)
-                budget.spend(result.total_tokens, result.cost_usd)
-                _record_spend(config.workdir, where, result.total_tokens, result.cost_usd)
-                if result.rate_limited:
-                    raise RateLimited(f"{where}: {result.error}")
+                attempt = 0
+                while True:
+                    budget.check()
+                    result = run_one(task, pin, condition, repeat, agent, config, executor)
+                    budget.spend(result.total_tokens, result.cost_usd)
+                    _record_spend(config.workdir, where, result.total_tokens, result.cost_usd)
+                    if not result.rate_limited:
+                        break
+                    if attempt >= len(config.rate_limit_backoff):
+                        _log_rate_limit(config.workdir, where, attempt, None, result.error)
+                        raise RateLimited(
+                            f"{where}: {result.error} (after {attempt} matrix-level wait(s))"
+                        )
+                    wait = config.rate_limit_backoff[attempt]
+                    _log_rate_limit(config.workdir, where, attempt, wait, result.error)
+                    config.sleep(wait)
+                    attempt += 1
                 if result.stop == "over_reserve":
                     raise BudgetExhausted(f"{where} passed its per-run reserve and was killed")
                 if result.stop in FATAL_STOPS:

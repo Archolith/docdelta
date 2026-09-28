@@ -40,6 +40,19 @@ elif mode == "expensive":
     import time; time.sleep(30)
 elif mode == "silent":
     emit({"type": "text", "part": {"text": "no usage"}})
+elif mode == "ratelimit_then_ok":
+    import time
+    print('timestamp=x level=ERROR message="stream error" error.error="Rate limit exceeded. Please try again later."', file=sys.stderr, flush=True)
+    time.sleep(1.5)
+    emit({"type": "text", "part": {"text": "```json\n{\"commands\": [\"make test\"]}\n```"}})
+    emit({"type": "step_finish", "part": {"reason": "stop", "cost": 0.001, "tokens": {"input": 10}}})
+elif mode == "ratelimit_forever":
+    import time
+    for _ in range(40):
+        print('timestamp=x level=ERROR message="stream error" error.error="Rate limit exceeded."', file=sys.stderr, flush=True)
+        time.sleep(0.25)
+elif mode == "ratelimit_exit":
+    print('timestamp=x level=ERROR message="stream error" error.error="Rate limit exceeded."', file=sys.stderr, flush=True)
 elif mode == "zerocost":
     emit({"type": "step_finish", "part": {"reason": "stop", "cost": 0, "tokens": {"input": 900000}}})
 elif mode == "infolog":
@@ -166,3 +179,27 @@ def test_builtin_provider_needs_no_key_or_config_entry(tmp_path: Path) -> None:
     with pytest.raises(IsolationError):
         minimal_config(source, "opencode/big-pickle", builtin_provider=False)
     assert minimal_config(source, "opencode/big-pickle", builtin_provider=True) == {"model": "opencode/big-pickle"}
+
+
+def test_wait_mode_lets_opencode_retry_past_a_rate_limit(fake_opencode) -> None:
+    agent, checkout, _ = fake_opencode("ratelimit_then_ok", rate_limit_wait_s=30)
+    run = agent.run("p", checkout, timeout_s=60, log_dir=checkout.parent)
+    assert not run.rate_limited and "make test" in run.final_text and run.rate_limit_hits == 1
+
+
+def test_stop_mode_still_stops_at_the_first_rate_limit(fake_opencode) -> None:
+    agent, checkout, _ = fake_opencode("ratelimit_then_ok")
+    run = agent.run("p", checkout, timeout_s=60, log_dir=checkout.parent)
+    assert run.rate_limited and run.seconds < 1.5
+
+
+def test_wait_mode_gives_up_when_the_limit_never_clears(fake_opencode) -> None:
+    agent, checkout, _ = fake_opencode("ratelimit_forever", rate_limit_wait_s=1.0)
+    run = agent.run("p", checkout, timeout_s=60, log_dir=checkout.parent)
+    assert run.rate_limited and run.seconds < 8
+
+
+def test_wait_mode_opencode_exiting_on_a_rate_limit_is_rate_limited(fake_opencode) -> None:
+    agent, checkout, _ = fake_opencode("ratelimit_exit", rate_limit_wait_s=30)
+    run = agent.run("p", checkout, timeout_s=60, log_dir=checkout.parent)
+    assert run.rate_limited

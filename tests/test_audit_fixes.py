@@ -184,3 +184,52 @@ def test_nested_context_md_is_a_human_page_even_when_folding_case(tmp_path: Path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("x", encoding="utf-8")
     assert find_agent_docs(tmp_path, fold_case=True) == ["CONTEXT.md"]
+
+
+class _LimitedAgent:
+    name = "limited"
+
+    def __init__(self, limited_calls: int) -> None:
+        self.model = "m"
+        self.limited_calls = limited_calls
+        self.calls = 0
+
+    def run(self, prompt: str, cwd: Path, *, timeout_s: float, log_dir: Path | None = None) -> AgentRun:
+        self.calls += 1
+        if self.calls <= self.limited_calls:
+            return AgentRun(final_text="", error="rate_limited", rate_limited=True, input_tokens=5)
+        return AgentRun(final_text='```json\n{"commands": ["make test"]}\n```', input_tokens=5, rate_limit_hits=0)
+
+
+def test_matrix_waits_then_retries_a_rate_limited_run(sample_repo: RepoPin, tmp_path: Path) -> None:
+    sleeps: list[float] = []
+    config = MatrixConfig(workdir=tmp_path / "work", repeats=1, rate_limit_backoff=(5.0,), sleep=sleeps.append)
+    agent = _LimitedAgent(limited_calls=1)
+    results = run_matrix([TASK], {"sample": sample_repo}, agent, config, Budget())
+    assert sleeps == [5.0] and agent.calls == 3 and len(results) == 2
+    log = (config.workdir / "ratelimit.log").read_text(encoding="utf-8")
+    assert "waiting 5s before retry 1" in log
+    assert (run_dir(config.workdir, "sample", "sample-t1", "with_docs", 1) / "result.json").is_file()
+    assert not (run_dir(config.workdir, "sample", "sample-t1", "with_docs", 1) / "rate_limited.json").exists()
+
+
+def test_matrix_stops_when_rate_limit_waits_run_out(sample_repo: RepoPin, tmp_path: Path) -> None:
+    from docdelta.budget import RateLimited
+
+    sleeps: list[float] = []
+    config = MatrixConfig(workdir=tmp_path / "work", repeats=1, rate_limit_backoff=(1.0, 2.0), sleep=sleeps.append)
+    agent = _LimitedAgent(limited_calls=99)
+    with pytest.raises(RateLimited):
+        run_matrix([TASK], {"sample": sample_repo}, agent, config, Budget())
+    assert sleeps == [1.0, 2.0] and agent.calls == 3
+    assert "giving up; matrix stops" in (config.workdir / "ratelimit.log").read_text(encoding="utf-8")
+
+
+def test_default_config_never_waits_on_a_rate_limit(sample_repo: RepoPin, tmp_path: Path) -> None:
+    from docdelta.budget import RateLimited
+
+    sleeps: list[float] = []
+    config = MatrixConfig(workdir=tmp_path / "work", repeats=1, sleep=sleeps.append)
+    with pytest.raises(RateLimited):
+        run_matrix([TASK], {"sample": sample_repo}, _LimitedAgent(limited_calls=1), config, Budget())
+    assert sleeps == []

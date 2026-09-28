@@ -25,6 +25,8 @@ class AgentRun:
     resumes: int = 0
     #: Instruction files the harness injected during the run (paths relative to the checkout).
     injected: list[str] = field(default_factory=list)
+    #: Rate-limit errors seen during the run (including ones the harness retried past).
+    rate_limit_hits: int = 0
 
 
 class AgentAdapter(Protocol):
