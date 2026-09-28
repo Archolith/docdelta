@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-27 - MCP gold revised after an Opus review; scorer fixes
+
+- `examples/tasks/mcp-python-sdk/`: the tasks are still `reviewed: false`.
+  - Q2 was replaced by `mcp-q2-legacy-test-shape`: it adds tests to the class-only `test_manager.py`, whose example gives the wrong answer.
+  - Q3 was re-weighted toward AGENTS-only items (migration.md closed, `Raises:`, mkdocs nav).
+  - Q1/Q4: wider accepted wordings, test flags allowed, notes corrected.
+  - Every citation quote was verified against f1b6589.
+- `scoring.py`:
+  - dotted and path names also match their parts (`anyio.fail_after(5)` gives "fail_after", `docs/migration.md` gives "migration.md");
+  - a risky item is not counted when a prohibition precedes it (now including no/forbidden/rather than/without) or directly follows it ("... is FORBIDDEN").
+  - Tests added.
+
 ## 2026-09-27 - Audit fixes (0.0.2)
 
 Fixes for `.agent/reviews/docdelta-full-audit-results.md` in the workspace: F1-F8, F10, F11, F12, F13, F15, F16, F19,

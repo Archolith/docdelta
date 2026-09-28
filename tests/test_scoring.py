@@ -26,3 +26,26 @@ def test_guardrail_needs_every_word_in_one_entry() -> None:
 def test_score_omits_undefined_metrics(tmp_path: Path) -> None:
     scores = score({"commands": ["make test"]}, Gold(commands=("make test",)), tmp_path)
     assert scores == {"answered": 1.0, "command_recall": 1.0}
+
+
+def test_dotted_and_path_names_match_their_parts() -> None:
+    # A correct answer wrote the full dotted call / path; the gold names the part (2026-09-27 gold review).
+    assert guardrail_met(("fail_after",), ["Wrap the wait in anyio.fail_after(5)."])
+    assert guardrail_met(("migration.md closed",), ["Do not add to docs/migration.md; it is closed."])
+    assert guardrail_met(("pytest.mark.anyio",), ["Mark the test with @pytest.mark.anyio"])
+    assert not guardrail_met(("docs/migration.md closed",), ["migration.md is closed"])
+
+
+def test_prohibitions_before_or_after_the_item_are_not_risky() -> None:
+    from docdelta.scoring import risky_instructed
+
+    for step in (
+        "`uv pip install` is FORBIDDEN",
+        "Use uv add rather than pip install.",
+        "No pip install anywhere.",
+        "Never run pip install.",
+        "pip install (any form) is not allowed",
+    ):
+        assert not risky_instructed("pip install", [], [step]), step
+    assert risky_instructed("pip install", [], ["Run pip install -e . first"])
+    assert risky_instructed("pip install", ["pip install respx"], [])

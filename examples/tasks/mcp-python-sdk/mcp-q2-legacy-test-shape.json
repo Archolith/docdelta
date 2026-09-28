@@ -1,0 +1,102 @@
+{
+  "repo": "mcp-python-sdk",
+  "task_id": "mcp-q2-legacy-test-shape",
+  "kind": "first_plan",
+  "prompt": "`PromptManager.remove_prompt` in `src/mcp/server/mcpserver/prompts/manager.py` raises `ValueError` for an unknown prompt name, but it has no tests. Add tests for removing a registered prompt and for removing an unknown one. Which file do the tests go in, what shape, names and docstrings should they have, and what command runs them?",
+  "reviewed": false,
+  "gold": {
+    "docs": [
+      "AGENTS.md"
+    ],
+    "files": [
+      "tests/server/mcpserver/prompts/test_manager.py",
+      "src/mcp/server/mcpserver/prompts/manager.py"
+    ],
+    "acceptable_files": [
+      ".claude/skills/test-quality/SKILL.md"
+    ],
+    "commands": [
+      "uv run --frozen pytest"
+    ],
+    "allowed_flags": [
+      "-k",
+      "-v",
+      "-vv",
+      "-q",
+      "-x"
+    ],
+    "guardrails": [],
+    "points": [
+      [
+        "plain top-level test functions, not methods of TestPromptManager",
+        "top-level test functions",
+        "top-level functions",
+        "module-level test functions",
+        "not inside TestPromptManager",
+        "do not add to the TestPromptManager class",
+        "no Test classes",
+        "don't follow the class pattern"
+      ],
+      [
+        "test names are behaviour sentences stating the outcome",
+        "behaviour sentence",
+        "behavior sentence",
+        "name states the observable outcome",
+        "name states the outcome"
+      ],
+      [
+        "docstring states provenance (spec-mandated, SDK-defined or pinned gap)",
+        "provenance",
+        "SDK-defined",
+        "spec-mandated"
+      ]
+    ],
+    "risky": [],
+    "verdict": ""
+  },
+  "gold_citations": [
+    {
+      "item": "tests/server/mcpserver/prompts/test_manager.py",
+      "path": "AGENTS.md",
+      "line_start": 81,
+      "line_end": 82,
+      "quote": "Add tests to the existing file for that module."
+    },
+    {
+      "item": "uv run --frozen pytest",
+      "path": "AGENTS.md",
+      "line_start": 70,
+      "line_end": 70,
+      "quote": "Framework: `uv run --frozen pytest`"
+    },
+    {
+      "item": "plain top-level test functions, not methods of TestPromptManager",
+      "path": "AGENTS.md",
+      "line_start": 72,
+      "line_end": 74,
+      "quote": "Legacy files still contain `Test*` classes; do NOT follow that pattern for new tests even when adding to such a file."
+    },
+    {
+      "item": "plain top-level test functions, not methods of TestPromptManager",
+      "path": ".claude/skills/test-quality/SKILL.md",
+      "line_start": 15,
+      "line_end": 15,
+      "quote": "Plain top-level `test_*` functions; no `Test` classes (legacy files have them"
+    },
+    {
+      "item": "test names are behaviour sentences stating the outcome",
+      "path": ".claude/skills/test-quality/SKILL.md",
+      "line_start": 13,
+      "line_end": 14,
+      "quote": "**Test names are behaviour sentences** stating the observable outcome, not the feature being"
+    },
+    {
+      "item": "docstring states provenance (spec-mandated, SDK-defined or pinned gap)",
+      "path": ".claude/skills/test-quality/SKILL.md",
+      "line_start": 16,
+      "line_end": 19,
+      "quote": "**Docstrings: 1–2 sentences of behaviour, honest about provenance**"
+    }
+  ],
+  "notes": "Replaces the first Q2 (mcp-q2-async-test), which the target file answered by example. The target test file is class-only (`class TestPromptManager:`, test_manager.py:9, no top-level tests) with feature-style names (test_add_prompt) and 'Test adding ...' docstrings, so imitating it gives the wrong answer on all three points; AGENTS.md:72-74 and the test-quality skill (removed in without_docs with .claude/**) give the right one. Points 2-3 require the agent to follow AGENTS.md:68's pointer to the skill. Drafted by Claude 2026-09-27 from pinned commit f1b6589, revised after an Opus gold review; needs owner review before it counts."
+}

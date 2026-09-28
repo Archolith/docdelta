@@ -14,7 +14,8 @@
     ],
     "acceptable_files": [
       "uv.lock",
-      "CONTRIBUTING.md"
+      "CONTRIBUTING.md",
+      ".pre-commit-config.yaml"
     ],
     "commands": [
       "uv add",
@@ -23,14 +24,20 @@
     ],
     "allowed_flags": [
       "--dev",
-      "--group"
+      "--group",
+      "-k",
+      "-v",
+      "-vv",
+      "-q",
+      "-x"
     ],
     "guardrails": [
       [
         "only use uv never pip",
         "never pip",
         "use uv not pip",
-        "no pip install"
+        "no pip install",
+        "never use pip"
       ],
       [
         "always pass --frozen",
@@ -40,7 +47,11 @@
       [
         "uv pip install is forbidden",
         "forbidden uv pip install",
-        "no uv pip install"
+        "no uv pip install",
+        "never uv pip install",
+        "not uv pip install",
+        "avoid uv pip install",
+        "don't uv pip install"
       ]
     ],
     "points": [],
@@ -100,5 +111,5 @@
       "quote": "FORBIDDEN: `uv pip install`, `@latest` syntax"
     }
   ],
-  "notes": "AGENTS-only rules: --frozen, never pip, uv pip forbidden. CONTRIBUTING.md shows `uv run pytest` without --frozen (line 116), which does not match the gold command. Drafted by Claude 2026-09-27 from the pinned commit; needs owner review before it counts."
+  "notes": "Clean AGENTS-only differentiators: guardrails 1 and 3 (never pip; `uv pip install` forbidden). `--frozen` is inferable without AGENTS.md (.pre-commit-config.yaml `uv run --frozen pyright`, scripts/test, .github/workflows/shared.yml, CONTRIBUTING.md:88), though CONTRIBUTING.md:116/122 show `uv run pytest`/`uv run pyright` without it. Gold `uv add` also matches a bare `uv add respx` (lenient; the matcher has no alternation). Drafted by Claude 2026-09-27 from pinned commit f1b6589, revised after an Opus gold review; needs owner review before it counts."
 }

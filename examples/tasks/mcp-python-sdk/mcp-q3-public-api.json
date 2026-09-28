@@ -14,34 +14,42 @@
     ],
     "acceptable_files": [
       "mkdocs.yml",
-      "docs/migration.md"
+      "docs/migration.md",
+      "VERSIONING.md",
+      "CONTRIBUTING.md",
+      "tests/client/test_session.py"
     ],
     "commands": [],
     "allowed_flags": [],
     "guardrails": [],
     "points": [
       [
-        "adding to __all__ is a deliberate API decision",
-        "__all__ defines the public API",
-        "not a convenience re-export"
+        "docs/migration.md is closed to new entries",
+        "do not add to migration.md",
+        "do not add to docs/migration.md",
+        "migration.md closed",
+        "docs/migration.md closed",
+        "no new migration.md entry"
       ],
       [
-        "changing an existing public signature needs an explicit maintainer decision",
-        "v2 public API is a compatibility contract",
-        "avoid breaking signature changes"
-      ],
-      [
-        "public APIs need docstrings with a Raises section",
-        "docstrings required",
+        "document caller-catchable exceptions in a Raises: section",
+        "raises section",
+        "raises: section",
         "document raised exceptions"
       ],
       [
-        "docs/migration.md is closed to new entries",
-        "do not add to migration.md"
+        "find the existing docs page via the mkdocs.yml nav rather than adding a new page",
+        "mkdocs.yml nav",
+        "find the page in mkdocs.yml",
+        "mkdocs.yml rather than a new page"
       ],
       [
-        "update the relevant docs pages under docs/ in the same PR",
-        "update docs in the same PR"
+        "the change to an existing public signature is breaking and needs an explicit maintainer decision",
+        "v2 public API is a compatibility contract",
+        "avoid breaking signature changes",
+        "breaking change held for the next major",
+        "add the parameter with a default",
+        "maintainer decision"
       ]
     ],
     "risky": [],
@@ -49,47 +57,40 @@
   },
   "gold_citations": [
     {
-      "item": "src/mcp/__init__.py",
-      "path": "AGENTS.md",
-      "line_start": 54,
-      "line_end": 55,
-      "quote": "`src/mcp/__init__.py` defines the public API surface via `__all__`."
-    },
-    {
-      "item": "adding to __all__ is a deliberate API decision",
-      "path": "AGENTS.md",
-      "line_start": 54,
-      "line_end": 55,
-      "quote": "Adding a symbol there is a deliberate API decision, not a convenience re-export."
-    },
-    {
-      "item": "changing an existing public signature needs an explicit maintainer decision",
-      "path": "AGENTS.md",
-      "line_start": 14,
-      "line_end": 18,
-      "quote": "its public API is a compatibility contract for the 2.x line"
-    },
-    {
-      "item": "public APIs need docstrings with a Raises section",
-      "path": "AGENTS.md",
-      "line_start": 51,
-      "line_end": 53,
-      "quote": "Public APIs must have docstrings."
-    },
-    {
       "item": "docs/migration.md is closed to new entries",
       "path": "AGENTS.md",
       "line_start": 19,
       "line_end": 20,
-      "quote": "`docs/migration.md` is the v1 -> v2 record and is closed to new entries."
+      "quote": "`docs/migration.md` is the v1 → v2 record and is closed to new entries."
     },
     {
-      "item": "update the relevant docs pages under docs/ in the same PR",
+      "item": "document caller-catchable exceptions in a Raises: section",
+      "path": "AGENTS.md",
+      "line_start": 51,
+      "line_end": 53,
+      "quote": "When a public API raises exceptions a caller would reasonably catch, document them in a `Raises:` section."
+    },
+    {
+      "item": "find the existing docs page via the mkdocs.yml nav rather than adding a new page",
       "path": "AGENTS.md",
       "line_start": 144,
       "line_end": 148,
-      "quote": "update the relevant page(s) under `docs/` in the same PR"
+      "quote": "Find the page covering the feature you touched in `mkdocs.yml` rather than adding a new one."
+    },
+    {
+      "item": "the change to an existing public signature is breaking and needs an explicit maintainer decision",
+      "path": "AGENTS.md",
+      "line_start": 14,
+      "line_end": 18,
+      "quote": "any change to an existing API's signature or observable behaviour (including ones softened by a `@deprecated` shim) is a design decision a maintainer makes explicitly, and should generally be avoided"
+    },
+    {
+      "item": "the change to an existing public signature is breaking and needs an explicit maintainer decision",
+      "path": "VERSIONING.md",
+      "line_start": 15,
+      "line_end": 23,
+      "quote": "changing a signature, return type, raised exception type, or documented behavior so that working code stops working"
     }
   ],
-  "notes": "All points AGENTS-only. Drafted by Claude 2026-09-27 from the pinned commit; needs owner review before it counts."
+  "notes": "Re-weighted toward AGENTS-only items: points 1-3. Point 1 is the strongest: VERSIONING.md:44 ('Every breaking change ... is documented in the Migration Guide') pushes a without-docs agent the wrong way. Point 4 is answerable from VERSIONING.md:15-23 in both conditions (kept for correctness; expect a tie on it). The __all__/new-public-API point was dropped: VERSIONING.md:11 and CONTRIBUTING.md:48-50 cover it. Drafted by Claude 2026-09-27 from pinned commit f1b6589, revised after an Opus gold review; needs owner review before it counts."
 }

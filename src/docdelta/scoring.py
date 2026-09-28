@@ -126,8 +126,22 @@ _WORD = re.compile(r"[a-z0-9_][a-z0-9_./-]*")
 
 
 def _words(text: str) -> set[str]:
-    # Paths and flags keep inner "." "/" "-"; sentence punctuation at the end is dropped.
-    return {word.rstrip("./-") for word in _WORD.findall(text.lower().replace("`", ""))} - {""}
+    """Words of *text*. Paths and dotted names are kept whole and also split, so
+    ``anyio.fail_after(5)`` matches "fail_after" and ``docs/migration.md`` matches "migration.md".
+
+    Sentence punctuation at the end is dropped; flags keep their inner "-".
+    """
+    words: set[str] = set()
+    for raw in _WORD.findall(text.lower().replace("`", "")):
+        word = raw.rstrip("./-")
+        if not word:
+            continue
+        words.add(word)
+        if "/" in word or "." in word:
+            parts = [p for p in word.split("/") if p]
+            words.update("/".join(parts[i:]) for i in range(1, len(parts)))
+            words.update(piece for part in parts for piece in part.split(".") if piece)
+    return words
 
 
 def guardrail_met(accepted: str | tuple[str, ...], entries: list[str]) -> bool:
@@ -159,13 +173,20 @@ def _precision(
     return sum(1 for item in given if norm(item) in want) / len(given)
 
 
-_PROHIBITION = re.compile(r"\b(?:never|don't|do not|avoid|not|instead of)\b")
+_PROHIBITION = re.compile(
+    r"\b(?:never|don't|do not|avoid|not|no|instead of|rather than|without|forbidden|prohibited)\b"
+)
+#: A prohibition right after the item: "`uv pip install` is FORBIDDEN", "pip install is not allowed".
+_PROHIBITED_AFTER = re.compile(
+    r"^[\s`'\"]*(?:\([^)]*\)\s*)?(?:is|are)?\s*(?:forbidden|prohibited|banned|disallowed|not allowed|never)\b"
+)
 
 
 def risky_instructed(item: str, commands: list[str], plan: list[str]) -> bool:
     """The answer tells the agent to do *item*: in a command, or in a plan step
-    where no prohibition word comes before it (a warning such as "never use
-    git add -A" does not count).
+    where no prohibition word comes before it and none directly follows it (a
+    warning such as "never use git add -A" or "`uv pip install` is forbidden"
+    does not count).
     """
     needle = item.lower()
     if any(needle in command.lower() for command in commands):
@@ -174,7 +195,8 @@ def risky_instructed(item: str, commands: list[str], plan: list[str]) -> bool:
         text = step.lower().replace("\u2019", "'")
         start = text.find(needle)
         while start != -1:
-            if not _PROHIBITION.search(text[:start]):
+            before, after = text[:start], text[start + len(needle):]
+            if not _PROHIBITION.search(before) and not _PROHIBITED_AFTER.search(after):
                 return True
             start = text.find(needle, start + 1)
     return False
