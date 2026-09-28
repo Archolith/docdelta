@@ -1,0 +1,10 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index 444c8a7..0cb2da9 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -2,3 +2,5 @@
+ - Follow OOP principles
+ - Be Pythonic: follow Python best practices and idiomatic patterns
+ - Write unit tests for new functionality
++- Before contributing, read CONTRIBUTING.md and follow its process rules.
++- Report suspected vulnerabilities as described in SECURITY.md.

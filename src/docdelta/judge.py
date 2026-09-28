@@ -10,7 +10,7 @@ points to guardrails. Per gold item the judge sees the question, the item and it
 wordings, the gold citation quotes as reference, and the answer's entries. It never sees the
 condition or other runs. A "met" verdict counts only when its evidence is copied from the
 answer, and one passage credits one item. Verdicts are cached per run in ``judged.json``
-keyed by model, prompt version and answer, so re-judging is free.
+keyed by model, prompt version, answer and gold, so re-judging unchanged runs is free.
 
 Stops: HTTP 429 raises :class:`JudgeRateLimited` (never retried); a call that could pass the
 dollar cap raises :class:`JudgeBudgetExhausted` before it is made. The key is never logged.
@@ -194,9 +194,10 @@ def openai_call(api_key: str, model: str, timeout_s: float = 60.0) -> Call:
     return call
 
 
-def _digest(model: str, answer: dict[str, Any] | None) -> str:
+def _digest(model: str, answer: dict[str, Any] | None, ref: dict[str, Any]) -> str:
+    """Cache key: a change to the model, prompt version, answer, question or gold re-judges."""
     return hashlib.sha256(
-        json.dumps([JUDGE_PROMPT_VERSION, model, answer], ensure_ascii=False, sort_keys=True).encode("utf-8")
+        json.dumps([JUDGE_PROMPT_VERSION, model, answer, ref], ensure_ascii=False, sort_keys=True).encode("utf-8")
     ).hexdigest()
 
 
@@ -219,7 +220,7 @@ def judge_workdir(
         if ref is None or not any(ref["items"].values()):
             continue
         answer = result.get("answer")
-        digest = _digest(model, answer)
+        digest = _digest(model, answer, ref)
         cache = path.parent / JUDGED_FILE
         if cache.is_file():
             cached = json.loads(cache.read_text(encoding="utf-8"))

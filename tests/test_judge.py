@@ -86,3 +86,16 @@ def test_judge_stops_before_passing_cap(tmp_path: Path) -> None:
     work, tasks = _setup(tmp_path)
     with pytest.raises(JudgeBudgetExhausted):
         judge_workdir(work, tasks, FakeJudge(), budget_usd=0.001)
+
+
+def test_gold_change_forces_rejudge(tmp_path: Path) -> None:
+    work, tasks = _setup(tmp_path)
+    judge_workdir(work, tasks, FakeJudge(), budget_usd=1.0)
+    task_file = tasks / "r" / "t1.json"
+    data = json.loads(task_file.read_text(encoding="utf-8"))
+    data["gold"]["guardrails"] = data["gold"]["guardrails"][:1]
+    task_file.write_text(json.dumps(data), encoding="utf-8")
+    again = FakeJudge()
+    judge_workdir(work, tasks, again, budget_usd=1.0)
+    assert again.calls == 4
+    assert all(r.scores["guardrail_recall_judged"] == 1.0 for r in load_results(work))

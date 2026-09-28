@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-27 - Pointer patch; h1 reviewed; h2 dropped
+
+- h1 gold was owner-reviewed: the "sandboxed backend escape is in scope" point was dropped and the task marked
+  `reviewed: true`. h2 was removed (ceiling); its runs were moved to `work/archive/`.
+- `judge.py`: the cache key now includes the question and gold, so editing the gold re-judges. Test added.
+- `examples/patches/pointer/smolagents.patch`: two lines pointing to CONTRIBUTING.md and SECURITY.md.
+- Pointer run, 5 repeats × t2 and h1 ($0.056 for agents, ~$0.03 to judge including the h1 re-judge).
+  All four t2 rules found:
+  - pointer 5/5, long patch 5/5, no docs 5/5, current AGENTS.md 2/5.
+  - t2 key point: pointer 0/5, current 1/5, none 2/5, long 3/5.
+  - h1 all six rules: pointer 1/5, current 3/5, none 4/5, long 3/5.
+
 ## 2026-09-27 - Held-out tasks for the smolagents patch (provisional)
 
 - `examples/tasks/smolagents/smolagents-h1-vuln-report.json` and `smolagents-h2-docs-preview.json`: drafted
