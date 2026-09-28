@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-28 - MCP python-sdk case study (Big Pickle)
+
+- Batch 1 (40 runs, judged, $0.02 for the judge; free agent), with vs without docs:
+  - Q1 0.97 vs 0.47;
+  - Q2 0.83 vs 0.00;
+  - Q3 0.80 vs 0.15;
+  - Q4 control 1.00 vs 0.90.
+- Batch 2 replicated Q1 (0.90 vs 0.53) and Q2 (0.90 vs 0.00), then hit a Zen free-tier 429 at 06:40 UTC on Q3
+  (stopped, not retried). Q3/Q4 replication is pending.
+- For free models the per-run token reserve was raised to 2M: at 400k it killed exactly the no-docs runs that explore most.
+- README: new MCP case study.
+
 ## 2026-09-27 - MCP gold revised after an Opus review; scorer fixes
 
 - `examples/tasks/mcp-python-sdk/`: the tasks are still `reviewed: false`.

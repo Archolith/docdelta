@@ -56,6 +56,39 @@ docdelta badge  --workdir work/real --repo smolagents --out badge.json
 
 `.env` holds `OPENAI_API_KEY`. Keys go only to the agent process and are scrubbed from saved logs.
 
+## Case study: MCP Python SDK (commit f1b6589): a large effect that replicates
+
+[modelcontextprotocol/python-sdk](https://github.com/modelcontextprotocol/python-sdk) keeps most of its
+concrete engineering rules only in `AGENTS.md` and the `.claude/skills/test-quality` skill it links to.
+Examples: uv with `--frozen`, never pip; top-level tests even in legacy class-based files; and
+`docs/migration.md` is closed to new entries. The four questions and their reviewed gold are in
+`examples/tasks/mcp-python-sdk/`:
+- three target rules that live only in the agent docs;
+- one is a control whose answer is in both AGENTS.md and CONTRIBUTING.md.
+
+The agent is `opencode/big-pickle` (OpenCode's free model) with docdelta 0.0.2. Each setup had 5 runs, and
+rules and points were judged by an LLM (gpt-6-luna). "Full" means a run scored 1.0.
+
+| Question | With agent docs | Without | Replication batch (with / without) |
+|---|---|---|---|
+| Q1 add a dev dependency, run tests, type-check | 0.97 (4/5 full) | 0.47 (0/5) | 0.90 / 0.53 |
+| Q2 add tests to a legacy class-only test file | 0.83 | 0.00 | 0.90 / 0.00 |
+| Q3 change a public API | 0.80 | 0.15 | pending |
+| Q4 control: backport a fix to v1 | 1.00 | 0.90 | pending |
+
+- **Q2 is the clearest case.** Without the agent docs, every run copied the legacy file: it put the new
+  tests inside `TestPromptManager` and ran `uv run pytest` without `--frozen`.
+- **The control roughly ties,** as it should when both files hold the answer.
+- **Tokens:** agent docs cut median tokens per run on Q1 (158k vs 283k), Q3 (487k vs 780k) and Q4
+  (143k vs 212k), but not on Q2 (280k vs 245k).
+- **Clean runs:** no run received injected instructions.
+- **Pending:** the replication batch hit the free tier's rate limit before Q3 and Q4. Those rows are
+  pending, not dropped.
+
+This is the positive control the smolagents study below lacked. When the rules really live only in
+the agent docs, docdelta measures a large, repeatable difference. When they don't (smolagents), the
+difference disappears.
+
 ## Case study: smolagents (commit 227ef5e): a result that did not replicate
 
 One question (`examples/tasks/smolagents/smolagents-t2-commands.json`) asks how to contribute a
